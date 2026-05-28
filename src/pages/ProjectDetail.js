@@ -31,6 +31,7 @@ export default function ProjectDetail() {
   const [pinFilter, setPinFilter] = useState('all');
 
   const [draggingPin, setDraggingPin] = useState(null);
+  const [movingPinId, setMovingPinId] = useState(null);
 
   const [selectedPin, setSelectedPin] = useState(null);
   const [addingPin, setAddingPin] = useState(false);
@@ -140,9 +141,8 @@ export default function ProjectDetail() {
 
   const handlePinPointerDown = (e, pin) => {
     e.stopPropagation();
-    // Yalnızca yöneticiler pini taşıyabilir (veya isterseniz herkes taşıyabilir)
-    const isManager = project.managerId === currentUser?.uid || project.memberRoles?.[currentUser?.uid] === 'manager' || userData?.isSuperAdmin;
-    if (isManager) {
+    // Sadece taşıma modu aktifse sürüklemeye izin ver
+    if (movingPinId === pin.id) {
       setDraggingPin({ id: pin.id, x: pin.x, y: pin.y });
     }
   };
@@ -164,6 +164,7 @@ export default function ProjectDetail() {
   const handlePointerUp = async () => {
     if (draggingPin && draggingPin.x !== undefined) {
       await updateDoc(doc(db, 'pins', draggingPin.id), { x: draggingPin.x, y: draggingPin.y });
+      setMovingPinId(null); // Taşıma modunu kapat
     }
     setDraggingPin(null);
   };
@@ -393,14 +394,34 @@ export default function ProjectDetail() {
                                 left: `${currentX}%`, 
                                 top: `${currentY}%`, 
                                 background: PIN_COLORS[pin.status] || '#F59E0B',
-                                cursor: isDragging ? 'grabbing' : 'grab',
-                                zIndex: isDragging ? 1000 : 10
+                                cursor: movingPinId === pin.id ? (isDragging ? 'grabbing' : 'grab') : 'pointer',
+                                zIndex: isDragging ? 1000 : 10,
+                                animation: movingPinId === pin.id && !isDragging ? 'pulse 1s infinite' : 'none',
+                                boxShadow: movingPinId === pin.id ? '0 0 0 4px rgba(59,130,246,0.6)' : undefined
                               }}
                               onMouseDown={e => handlePinPointerDown(e, pin)}
                               onTouchStart={e => handlePinPointerDown(e, pin)}
-                              onClick={e => { e.stopPropagation(); if(!isDragging) setSelectedPin(pin); }}
+                              onClick={e => { e.stopPropagation(); if (!movingPinId) setSelectedPin(pin); }}
                             >
-                              <div className="pin-tooltip">{pin.title}</div>
+                              <div className="pin-tooltip">
+                                {pin.title}
+                                {isManager && movingPinId !== pin.id && (
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); setMovingPinId(pin.id); }}
+                                    style={{ marginLeft: 8, background: '#3b82f6', color: '#fff', border: 'none', borderRadius: 4, padding: '2px 8px', fontSize: 11, cursor: 'pointer', fontWeight: 600 }}
+                                  >
+                                    ✥ Taşı
+                                  </button>
+                                )}
+                                {movingPinId === pin.id && !isDragging && (
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); setMovingPinId(null); }}
+                                    style={{ marginLeft: 8, background: '#ef4444', color: '#fff', border: 'none', borderRadius: 4, padding: '2px 8px', fontSize: 11, cursor: 'pointer', fontWeight: 600 }}
+                                  >
+                                    ✕ İptal
+                                  </button>
+                                )}
+                              </div>
                             </div>
                           );
                         })}
