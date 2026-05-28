@@ -41,8 +41,22 @@ export default function PinDetailModal({ pin, projectId, isManager, onClose }) {
       setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
     });
     
-    getDocs(collection(db, 'users')).then(snap => {
-      setUsers([{ name: 'Herkes' }, ...snap.docs.map(d => ({ id: d.id, ...d.data() }))]);
+    // Sadece bu projenin aktif üyelerini çek
+    getDocs(query(collection(db, 'projects'), where('__name__', '==', projectId))).then(async snap => {
+      if (snap.empty) return;
+      const projectData = snap.docs[0].data();
+      const memberIds = Object.keys(projectData.memberRoles || {});
+      // Manager'ı da ekle
+      if (projectData.managerId && !memberIds.includes(projectData.managerId)) {
+        memberIds.push(projectData.managerId);
+      }
+      if (memberIds.length > 0) {
+        const userSnap = await getDocs(collection(db, 'users'));
+        const projectUsers = userSnap.docs
+          .filter(d => memberIds.includes(d.id))
+          .map(d => ({ id: d.id, ...d.data() }));
+        setUsers([{ name: 'Herkes' }, ...projectUsers]);
+      }
     });
 
     return () => unsub();
@@ -58,15 +72,15 @@ export default function PinDetailModal({ pin, projectId, isManager, onClose }) {
     if (!text.trim() && !fileUrl) return;
     
     let notificationPromises = [];
-    const mentionedUsernames = Array.from(new Set(text.match(/@(\w+)/g) || [])).map(m => m.slice(1));
-    for (const username of mentionedUsernames) {
-      if (username === userData?.name) continue;
-      const userDoc = users.find(u => u.name === username);
-      if (userDoc && userDoc.id) {
+    // Kullanıcı isimlerini metin içinde ara (boşluklu isimler dahil)
+    const projectUsers = users.filter(u => u.name && u.name !== 'Herkes' && u.name !== userData?.name);
+    for (const userDoc of projectUsers) {
+      if (text.includes(`@${userDoc.name}`)) {
         notificationPromises.push(
           addDoc(collection(db, 'notifications'), {
             userId: userDoc.id,
             projectId: projectId,
+            pinId: pin.id,
             type: 'mention',
             message: `${userData?.name}, "${pin.title}" pininde senden bahsetti.`,
             read: false,

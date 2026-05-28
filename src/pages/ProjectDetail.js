@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { db } from '../firebase';
 import { doc, getDoc, collection, query, where, addDoc, serverTimestamp, onSnapshot, updateDoc, getDocs } from 'firebase/firestore';
 import { useAuth } from '../contexts/AuthContext';
@@ -20,6 +20,7 @@ export default function ProjectDetail() {
   const { projectId } = useParams();
   const navigate = useNavigate();
   const { currentUser, userData } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
   const imageRef = useRef(null);
 
   const [project, setProject] = useState(null);
@@ -46,7 +47,20 @@ export default function ProjectDetail() {
     fetchProject();
     const unsub = onSnapshot(
       query(collection(db, 'pins'), where('projectId', '==', projectId), where('isArchived', '==', false)),
-      snap => setPins(snap.docs.map(d => ({ id: d.id, ...d.data() })))
+      snap => {
+        const loadedPins = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        setPins(loadedPins);
+        
+        // Bildirimden gelen pin parametresini kontrol et
+        const pinIdFromUrl = searchParams.get('pin');
+        if (pinIdFromUrl && !selectedPin) {
+          const targetPin = loadedPins.find(p => p.id === pinIdFromUrl);
+          if (targetPin) {
+            setSelectedPin(targetPin);
+            setSearchParams({}, { replace: true }); // URL'den ?pin= parametresini temizle
+          }
+        }
+      }
     );
     return () => unsub();
   }, [projectId]);

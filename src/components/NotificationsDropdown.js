@@ -43,7 +43,9 @@ export default function NotificationsDropdown() {
     }
     setIsOpen(false);
     if (notif.projectId) {
-      navigate(`/project/${notif.projectId}`);
+      // pinId varsa URL'ye ekle, ProjectDetail bu parametreyi okuyacak
+      const pinParam = notif.pinId ? `?pin=${notif.pinId}` : '';
+      navigate(`/project/${notif.projectId}${pinParam}`);
     }
   };
 
