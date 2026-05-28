@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { db } from '../firebase';
-import { collection, query, where, orderBy, onSnapshot, addDoc, serverTimestamp, updateDoc, doc, deleteDoc, getDocs } from 'firebase/firestore';
+import { collection, query, where, orderBy, onSnapshot, addDoc, serverTimestamp, updateDoc, doc, deleteDoc, getDocs, getDoc } from 'firebase/firestore';
 import { useAuth } from '../contexts/AuthContext';
 import ProjectGallery from './ProjectGallery';
 import ImageMarkupModal from './ImageMarkupModal';
@@ -42,19 +42,25 @@ export default function PinDetailModal({ pin, projectId, isManager, onClose }) {
     });
     
     // Sadece bu projenin aktif üyelerini çek
-    getDocs(query(collection(db, 'projects'), where('__name__', '==', projectId))).then(async snap => {
-      if (snap.empty) return;
-      const projectData = snap.docs[0].data();
-      const memberIds = Object.keys(projectData.memberRoles || {});
+    getDoc(doc(db, 'projects', projectId)).then(async projectSnap => {
+      if (!projectSnap.exists()) return;
+      const projectData = projectSnap.data();
+      const allRoles = projectData.memberRoles || {};
+      // null/silinmiş üyeleri filtrele
+      const memberIds = Object.keys(allRoles).filter(uid => allRoles[uid] !== null && allRoles[uid] !== undefined);
       // Manager'ı da ekle
       if (projectData.managerId && !memberIds.includes(projectData.managerId)) {
         memberIds.push(projectData.managerId);
       }
       if (memberIds.length > 0) {
-        const userSnap = await getDocs(collection(db, 'users'));
-        const projectUsers = userSnap.docs
-          .filter(d => memberIds.includes(d.id))
-          .map(d => ({ id: d.id, ...d.data() }));
+        // Her bir üyeyi doğrudan kontrol et
+        const projectUsers = [];
+        for (const uid of memberIds) {
+          const userSnap = await getDoc(doc(db, 'users', uid));
+          if (userSnap.exists()) {
+            projectUsers.push({ id: userSnap.id, ...userSnap.data() });
+          }
+        }
         setUsers([{ name: 'Herkes' }, ...projectUsers]);
       }
     });
