@@ -1,0 +1,463 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { db } from '../firebase';
+import { collection, query, where, orderBy, onSnapshot, addDoc, serverTimestamp, updateDoc, doc, deleteDoc, getDocs } from 'firebase/firestore';
+import { useAuth } from '../contexts/AuthContext';
+import ProjectGallery from './ProjectGallery';
+import ImageMarkupModal from './ImageMarkupModal';
+import { MapPin, MessageSquare, Images, Info, Trash2, Edit2, Paperclip, CornerUpLeft, ClipboardList, FolderOpen, FileText, Image as ImageIcon, UserCheck } from 'lucide-react';
+
+const CLOUDINARY_CLOUD = 'dcx4qribb';
+const CLOUDINARY_PRESET = 'insaat-upload';
+
+export default function PinDetailModal({ pin, projectId, isManager, onClose }) {
+  const [activeTab, setActiveTab] = useState('chat');
+  const [messages, setMessages] = useState([]);
+  const [files, setFiles] = useState([]);
+  const [text, setText] = useState('');
+  const [replyTo, setReplyTo] = useState(null);
+  const [editingMessageId, setEditingMessageId] = useState(null);
+  const [editingMessageText, setEditingMessageText] = useState('');
+  const [uploading, setUploading] = useState(false);
+  const [status, setStatus] = useState(pin.status);
+  const [priority, setPriority] = useState(pin.priority || 'Normal');
+  const [assignee, setAssignee] = useState(pin.assignee || '');
+  const [pinInfo, setPinInfo] = useState(pin.info || '');
+  const [editingInfo, setEditingInfo] = useState(false);
+  const [savingInfo, setSavingInfo] = useState(false);
+  const [users, setUsers] = useState([]);
+  const [showMention, setShowMention] = useState(false);
+  const [mentionSearch, setMentionSearch] = useState('');
+  
+  const [markupImageUrl, setMarkupImageUrl] = useState(null);
+  const [markupTarget, setMarkupTarget] = useState(null);
+
+  const { currentUser, userData } = useAuth();
+  const bottomRef = useRef(null);
+
+  useEffect(() => {
+    const q = query(collection(db, 'messages'), where('pinId', '==', pin.id), orderBy('createdAt', 'asc'));
+    const unsub = onSnapshot(q, snap => {
+      setMessages(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
+    });
+    
+    getDocs(collection(db, 'users')).then(snap => {
+      setUsers([{ name: 'Herkes' }, ...snap.docs.map(d => ({ id: d.id, ...d.data() }))]);
+    });
+
+    return () => unsub();
+  }, [pin.id]);
+
+  useEffect(() => {
+    const q = query(collection(db, 'files'), where('pinId', '==', pin.id));
+    const unsub = onSnapshot(q, snap => setFiles(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+    return () => unsub();
+  }, [pin.id]);
+
+  async function sendMessage(fileUrl = null, fileType = null) {
+    if (!text.trim() && !fileUrl) return;
+    
+    let notificationPromises = [];
+    const mentionedUsernames = Array.from(new Set(text.match(/@(\w+)/g) || [])).map(m => m.slice(1));
+    for (const username of mentionedUsernames) {
+      if (username === userData?.name) continue;
+      const userDoc = users.find(u => u.name === username);
+      if (userDoc && userDoc.id) {
+        notificationPromises.push(
+          addDoc(collection(db, 'notifications'), {
+            userId: userDoc.id,
+            projectId: projectId,
+            type: 'mention',
+            message: `${userData?.name}, "${pin.title}" pininde senden bahsetti.`,
+            read: false,
+            createdAt: serverTimestamp()
+          })
+        );
+      }
+    }
+
+    try {
+      await Promise.all([
+        addDoc(collection(db, 'messages'), {
+          projectId, pinId: pin.id,
+          userId: currentUser.uid,
+          userName: userData?.name,
+          userRole: userData?.role,
+          text: text.trim(),
+          fileUrl: fileUrl || null,
+          fileType: fileType || null,
+          replyTo: replyTo || null,
+          createdAt: serverTimestamp()
+        }),
+        ...notificationPromises
+      ]);
+      setText('');
+      setReplyTo(null);
+    } catch (err) {
+      console.error(err);
+    }
+  }
+
+  async function uploadToCloudinary(file, target, description = '') {
+    if (file.size > 10 * 1024 * 1024) { alert('Dosya 10MB\'dan küçük olmalı'); return; }
+    setUploading(true);
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('upload_preset', CLOUDINARY_PRESET);
+    try {
+      const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD}/auto/upload`, { method: 'POST', body: formData });
+      const data = await res.json();
+      if (target === 'chat') {
+        await sendMessage(data.secure_url, file.type);
+      } else {
+        await addDoc(collection(db, 'files'), {
+          pinId: pin.id, projectId,
+          userId: currentUser.uid, userName: userData?.name,
+          name: file.name, url: data.secure_url, type: file.type,
+          description: description,
+          createdAt: serverTimestamp()
+        });
+      }
+    } catch (err) { alert('Yükleme başarısız'); }
+    setUploading(false);
+  }
+
+  function handleFileSelect(e, target) {
+    const file = e.target.files[0];
+    if (!file) return;
+    
+    if (file.type.startsWith('image/')) {
+      // Eğer fotoğrafsa çizim ekranını aç
+      setMarkupImageUrl(URL.createObjectURL(file));
+      setMarkupTarget(target);
+    } else {
+      let description = '';
+      if (target === 'files') {
+        description = window.prompt("Dosya için bir açıklama (isteğe bağlı):") || '';
+      }
+      uploadToCloudinary(file, target, description);
+    }
+    e.target.value = '';
+  }
+
+  async function handleMarkupComplete(blob) {
+    let description = '';
+    if (markupTarget === 'files') {
+      description = window.prompt("Fotoğraf için bir açıklama (isteğe bağlı):") || '';
+    }
+    const markupFile = new File([blob], 'photo_markup.jpg', { type: 'image/jpeg' });
+    setMarkupImageUrl(null);
+    await uploadToCloudinary(markupFile, markupTarget, description);
+    setMarkupTarget(null);
+  }
+
+  async function deleteFile(fileId) {
+    if (window.confirm('Bu dosyayı/fotoğrafı silmek istediğinize emin misiniz?')) {
+      try {
+        await deleteDoc(doc(db, 'files', fileId));
+      } catch (err) {
+        console.error('Dosya silinirken hata:', err);
+      }
+    }
+  }
+
+  async function updateStatus(newStatus) {
+    await updateDoc(doc(db, 'pins', pin.id), { status: newStatus });
+    setStatus(newStatus);
+  }
+
+  async function savePinInfo() {
+    setSavingInfo(true);
+    await updateDoc(doc(db, 'pins', pin.id), { 
+      info: pinInfo,
+      priority,
+      assignee
+    });
+    setSavingInfo(false);
+    setEditingInfo(false);
+  }
+
+  async function deletePin() {
+    if (!window.confirm('Pin silinecek, sohbet arşive taşınacak. Devam?')) return;
+    await updateDoc(doc(db, 'pins', pin.id), { isArchived: true });
+    onClose();
+  }
+
+  async function deleteMessage(msgId) {
+    if (window.confirm('Bu mesajı silmek istediğinize emin misiniz?')) {
+      await deleteDoc(doc(db, 'messages', msgId));
+    }
+  }
+
+  async function saveMessageEdit(msgId) {
+    if (editingMessageText.trim()) {
+      await updateDoc(doc(db, 'messages', msgId), { text: editingMessageText.trim() });
+    } else {
+      await deleteMessage(msgId);
+    }
+    setEditingMessageId(null);
+  }
+
+  const renderTextWithMentions = (text) => {
+    if (!text) return null;
+    const parts = text.split(/(@\S+)/g);
+    return parts.map((part, i) => 
+      part.startsWith('@') ? <span key={i} className="mention-highlight">{part}</span> : part
+    );
+  };
+
+  const handleTextChange = (e) => {
+    const val = e.target.value;
+    setText(val);
+    const match = val.match(/(?:\s|^)@(\S*)$/);
+    if (match) {
+      setShowMention(true);
+      setMentionSearch(match[1].toLowerCase());
+    } else {
+      setShowMention(false);
+    }
+  };
+
+  const handleMentionSelect = (name) => {
+    const replaced = text.replace(/(?:\s|^)@(\S*)$/, ` @${name.replace(/\s+/g, '')} `);
+    setText(replaced);
+    setShowMention(false);
+  };
+
+  const filteredUsers = users.filter(u => u.name?.toLowerCase().includes(mentionSearch));
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      {markupImageUrl && (
+        <ImageMarkupModal
+          imageUrl={markupImageUrl}
+          onSave={handleMarkupComplete}
+          onCancel={() => { setMarkupImageUrl(null); setMarkupTarget(null); }}
+        />
+      )}
+      <div className="pin-modal" onClick={e => e.stopPropagation()}>
+        <div className="pin-modal-header">
+          <div>
+            <h2 style={{ display: 'flex', alignItems: 'center' }}>
+              <MapPin size={24} color="var(--primary-color)" style={{ marginRight: '8px' }} /> {pin.title}
+            </h2>
+            <span className="pin-category">{pin.category}</span>
+          </div>
+          <div className="pin-header-actions">
+            {isManager && <button className="btn-danger" onClick={deletePin}><Trash2 size={18} /></button>}
+            <button className="btn-secondary" onClick={onClose} style={{ padding: '8px 12px' }}>✕</button>
+          </div>
+        </div>
+
+        <div className="pin-tabs">
+          <button className={activeTab === 'chat' ? 'tab active' : 'tab'} onClick={() => setActiveTab('chat')}>
+            <MessageSquare size={16} style={{ marginRight: '6px' }} /> Sohbet
+          </button>
+          <button className={activeTab === 'gallery' ? 'tab active' : 'tab'} onClick={() => setActiveTab('gallery')}>
+            <Images size={16} style={{ marginRight: '6px' }} /> Galeri
+          </button>
+          <button className={activeTab === 'info' ? 'tab active' : 'tab'} onClick={() => setActiveTab('info')}>
+            <Info size={16} style={{ marginRight: '6px' }} /> Bilgiler
+          </button>
+        </div>
+
+        {activeTab === 'gallery' && (
+          <div style={{ flex: 1, overflowY: 'auto' }}>
+            <ProjectGallery projectId={projectId} pinId={pin.id} />
+          </div>
+        )}
+
+        {activeTab === 'chat' && (
+          <div className="chat-container">
+            <div className="messages-list">
+              {messages.length === 0 && <div className="chat-empty">Henüz mesaj yok.</div>}
+              {messages.map(msg => (
+                <div key={msg.id} className={`message ${msg.userId === currentUser.uid ? 'own' : ''}`}>
+                  <div className="message-header">
+                    <span className="message-name">{msg.userName}</span>
+                    <span className="message-role">({msg.userRole})</span>
+                    <div className="message-actions" style={{ display: 'inline-flex', gap: 6, marginLeft: 10 }}>
+                      <button style={{ background: 'none', border: 'none', cursor: 'pointer', opacity: 0.6 }} onClick={() => setReplyTo({ id: msg.id, userName: msg.userName, text: msg.text || 'Fotoğraf' })}>
+                        <CornerUpLeft size={14} color="#94a3b8" />
+                      </button>
+                      {msg.userId === currentUser.uid && (
+                        <>
+                          <button style={{ background: 'none', border: 'none', cursor: 'pointer', opacity: 0.6 }} onClick={() => { setEditingMessageId(msg.id); setEditingMessageText(msg.text); }}>
+                            <Edit2 size={14} color="#94a3b8" />
+                          </button>
+                          <button style={{ background: 'none', border: 'none', cursor: 'pointer', opacity: 0.6 }} onClick={() => deleteMessage(msg.id)}>
+                            <Trash2 size={14} color="#ef4444" />
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                  {msg.replyTo && (
+                    <div className="reply-quote">
+                      <strong>{msg.replyTo.userName}</strong>
+                      {msg.replyTo.text.length > 50 ? msg.replyTo.text.substring(0, 50) + '...' : msg.replyTo.text}
+                    </div>
+                  )}
+                  {msg.text && (
+                    <div className="message-text">
+                      {editingMessageId === msg.id ? (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                          <input autoFocus value={editingMessageText} onChange={e => setEditingMessageText(e.target.value)} onKeyDown={e => e.key === 'Enter' && saveMessageEdit(msg.id)} style={{ width: '100%', padding: '4px 8px', borderRadius: 4, border: 'none', color: '#000' }} />
+                          <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                            <button onClick={() => saveMessageEdit(msg.id)} style={{ fontSize: 11, padding: '2px 8px', cursor: 'pointer', background: '#fff', border: 'none', borderRadius: 4, color: '#000' }}>Kaydet</button>
+                            <button onClick={() => setEditingMessageId(null)} style={{ fontSize: 11, padding: '2px 8px', cursor: 'pointer', background: 'transparent', border: '1px solid #fff', borderRadius: 4, color: '#fff' }}>İptal</button>
+                          </div>
+                        </div>
+                      ) : (
+                        <>
+                          {renderTextWithMentions(msg.text)}
+                          {msg.createdAt && <span className="message-time">{msg.createdAt.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>}
+                        </>
+                      )}
+                    </div>
+                  )}
+                  {msg.fileUrl && (
+                    msg.fileType?.startsWith('image/')
+                      ? <div style={{ position: 'relative', display: 'inline-block' }}>
+                          <img src={msg.fileUrl} alt="upload" className="message-image" />
+                          {msg.createdAt && !msg.text && (
+                            <span className="message-time" style={{ bottom: 22, right: 8, color: '#fff', background: 'rgba(0,0,0,0.5)', padding: '2px 6px', borderRadius: 10 }}>
+                              {msg.createdAt.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                          )}
+                        </div>
+                      : <a href={msg.fileUrl} target="_blank" rel="noreferrer" className="message-file">
+                          <Paperclip size={14} style={{ marginRight: '4px' }} /> Dosyayı Aç
+                        </a>
+                  )}
+                </div>
+              ))}
+              <div ref={bottomRef} />
+            </div>
+            <div className="chat-input" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {replyTo && (
+                <div style={{ background: 'rgba(255,255,255,0.05)', padding: '6px 12px', borderRadius: 6, display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 13, borderLeft: '3px solid var(--primary-color)' }}>
+                  <div>
+                    <strong style={{ color: 'var(--primary-color)' }}>{replyTo.userName}</strong> yanıtlanıyor
+                  </div>
+                  <button onClick={() => setReplyTo(null)} style={{ background: 'none', border: 'none', color: '#fff', cursor: 'pointer', padding: '0 4px' }}>✕</button>
+                </div>
+              )}
+              <div style={{ position: 'relative', display: 'flex', gap: 10, width: '100%', alignItems: 'center' }}>
+                {showMention && filteredUsers.length > 0 && (
+                  <div style={{ position: 'absolute', bottom: '100%', left: 0, background: '#1e293b', border: '1px solid #334155', borderRadius: 8, padding: 8, zIndex: 10, maxHeight: 150, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 4, width: 200, marginBottom: 8, boxShadow: '0 10px 25px rgba(0,0,0,0.5)' }}>
+                    {filteredUsers.map((u, i) => (
+                      <div key={i} onClick={() => handleMentionSelect(u.name)} style={{ padding: '6px 10px', cursor: 'pointer', borderRadius: 4, fontSize: 13, color: '#fff', background: 'rgba(255,255,255,0.05)' }}>
+                        {u.name}
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <input placeholder="Mesaj yaz... (@kisi)" value={text}
+                  onChange={handleTextChange}
+                  onKeyDown={e => e.key === 'Enter' && !showMention && sendMessage()} />
+                <label className="upload-btn">
+                  {uploading ? '⏳' : '📎'}
+                  <input type="file" hidden onChange={e => handleFileSelect(e, 'chat')} accept="image/*,.pdf,.doc,.docx" />
+                </label>
+                <button className="btn-primary" onClick={() => sendMessage()}>Gönder</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'info' && (
+          <div className="files-container">
+            <div className="pin-info-section">
+              <div className="pin-info-header" style={{ justifyContent: 'flex-end', marginBottom: '8px', display: 'flex', alignItems: 'center' }}>
+                {isManager && !editingInfo && (
+                  <button className="btn-secondary" style={{ padding: '6px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => setEditingInfo(true)}>
+                    <Edit2 size={16} />
+                  </button>
+                )}
+              </div>
+              {editingInfo ? (
+                <div>
+                  <input type="text" placeholder="Sorumlu Kişi / Ekip" value={assignee} onChange={e => setAssignee(e.target.value)} style={{ width: '100%', padding: '8px 10px', border: '1px solid #e2e8f0', borderRadius: 8, marginBottom: 10, fontSize: 14 }} />
+                  <textarea value={pinInfo} onChange={e => setPinInfo(e.target.value)}
+                    placeholder="Bu pin hakkında bilgiler, yapılacaklar (madde başı tire ile)..." rows={5}
+                    style={{ width: '100%', padding: '10px', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: 14, fontFamily: 'inherit', resize: 'vertical' }} />
+                  <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                    <button className="btn-primary" onClick={savePinInfo} disabled={savingInfo}>
+                      {savingInfo ? 'Kaydediliyor...' : 'Kaydet'}
+                    </button>
+                    <button className="btn-secondary" onClick={() => { setEditingInfo(false); setPinInfo(pin.info || ''); setAssignee(pin.assignee || ''); }}>İptal</button>
+                  </div>
+                </div>
+              ) : (
+                <div style={{ fontSize: 14, color: 'var(--text-main)', lineHeight: 1.7 }}>
+                  {assignee && (
+                    <div style={{ marginBottom: 16, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <UserCheck size={16} color="var(--primary-color)" />
+                      <span style={{ color: 'var(--text-muted)' }}>Sorumlu:</span>
+                      <span style={{ background: 'var(--bg-card-hover)', padding: '4px 10px', borderRadius: 12, fontWeight: 600 }}>{assignee}</span>
+                    </div>
+                  )}
+                  <div style={{ whiteSpace: 'pre-wrap', color: pinInfo ? 'var(--text-main)' : 'var(--text-muted)' }}>
+                    {pinInfo || (isManager ? 'Henüz bilgi eklenmemiş. Düzenle butonuna tıklayın.' : 'Henüz bilgi eklenmemiş.')}
+                  </div>
+                </div>
+              )}
+            </div>
+            <div className="pin-files-section">
+              <div className="pin-info-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                <h4 style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
+                  <FolderOpen size={18} /> TEKNİK DOSYALAR
+                </h4>
+                {isManager && (
+                  <label className="btn-primary" style={{ padding: '6px', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '32px', height: '32px' }}>
+                    {uploading ? <span style={{ fontSize: '12px' }}>⏳</span> : <span style={{ fontSize: '20px', fontWeight: 'bold', lineHeight: 1 }}>+</span>}
+                    <input type="file" hidden onChange={e => handleFileSelect(e, 'files')} accept="image/*,.pdf,.doc,.docx" />
+                  </label>
+                )}
+              </div>
+              <div className="files-list">
+                {files.length === 0 ? <p className="empty-state" style={{ color: 'var(--text-muted)' }}>Henüz dosya yok.</p> : files.map(file => (
+                  <a key={file.id} href={file.url} target="_blank" rel="noreferrer" className="file-item" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: '12px' }}>
+                    {file.type?.startsWith('image/') && (
+                      <div style={{ width: '100%', height: '140px', overflow: 'hidden', borderRadius: '8px' }}>
+                        <img src={file.url} alt={file.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      </div>
+                    )}
+                    <div style={{ width: '100%' }}>
+                      {file.description && (
+                        <p style={{ fontSize: '13px', color: 'var(--text-main)', marginBottom: '8px', lineHeight: 1.5 }}>
+                          {file.description}
+                        </p>
+                      )}
+                      <div style={{ display: 'flex', width: '100%', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: 'var(--text-muted)' }}>
+                          {!file.type?.startsWith('image/') && <FileText size={16} color="var(--primary-color)" />}
+                          {file.type?.startsWith('image/') ? 'Fotoğraf Görüntüsü' : file.name}
+                        </span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span className="file-uploader" style={{ fontSize: '12px', background: 'rgba(59, 130, 246, 0.1)', padding: '2px 8px', borderRadius: '12px', color: 'var(--primary-color)' }}>
+                            {file.userName}
+                          </span>
+                          {(isManager || file.userId === currentUser.uid) && (
+                            <button
+                              onClick={(e) => { e.preventDefault(); e.stopPropagation(); deleteFile(file.id); }}
+                              style={{ background: 'rgba(239, 68, 68, 0.1)', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '4px', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                              title="Sil"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </a>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

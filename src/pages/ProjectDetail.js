@@ -1,0 +1,515 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { db } from '../firebase';
+import { doc, getDoc, collection, query, where, addDoc, serverTimestamp, onSnapshot, updateDoc, getDocs } from 'firebase/firestore';
+import { useAuth } from '../contexts/AuthContext';
+import PinDetailModal from '../components/PinDetailModal';
+import GeneralChat from '../components/GeneralChat';
+import ProjectGallery from '../components/ProjectGallery';
+import ProjectTeam from '../components/ProjectTeam';
+import NotificationsDropdown from '../components/NotificationsDropdown';
+import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
+import { Building, Ruler, MessageSquare, Info, Users, MapPin } from 'lucide-react';
+
+const PIN_COLORS = { 'açık': '#ef4444', 'devam ediyor': '#f59e0b', 'çözüldü': '#22c55e' };
+const CATEGORIES = ['yapısal', 'elektrik', 'tesisat', 'genel'];
+const CLOUDINARY_CLOUD = 'dcx4qribb';
+const CLOUDINARY_PRESET = 'insaat-upload';
+
+export default function ProjectDetail() {
+  const { projectId } = useParams();
+  const navigate = useNavigate();
+  const { currentUser, userData } = useAuth();
+  const imageRef = useRef(null);
+
+  const [project, setProject] = useState(null);
+  const [pins, setPins] = useState([]);
+  const [activeTab, setActiveTab] = useState('plan');
+  const [activeFloor, setActiveFloor] = useState(0);
+  const [pinSearch, setPinSearch] = useState('');
+  const [pinFilter, setPinFilter] = useState('all');
+
+  const [draggingPin, setDraggingPin] = useState(null);
+
+  const [selectedPin, setSelectedPin] = useState(null);
+  const [addingPin, setAddingPin] = useState(false);
+  const [newPinData, setNewPinData] = useState({ title: '', category: 'genel' });
+  const [newPinCoords, setNewPinCoords] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [uploadingPlan, setUploadingPlan] = useState(false);
+  const [editingInfo, setEditingInfo] = useState(false);
+  const [projectInfo, setProjectInfo] = useState({});
+  const [editingFloorIndex, setEditingFloorIndex] = useState(null);
+  const [editingFloorName, setEditingFloorName] = useState('');
+
+  useEffect(() => {
+    fetchProject();
+    const unsub = onSnapshot(
+      query(collection(db, 'pins'), where('projectId', '==', projectId), where('isArchived', '==', false)),
+      snap => setPins(snap.docs.map(d => ({ id: d.id, ...d.data() })))
+    );
+    return () => unsub();
+  }, [projectId]);
+
+  async function fetchProject() {
+    const snap = await getDoc(doc(db, 'projects', projectId));
+    if (snap.exists()) {
+      const data = { id: snap.id, ...snap.data() };
+      setProject(data);
+      setProjectInfo({ name: data.name, description: data.description, address: data.address, startDate: data.startDate, notes: data.notes || '' });
+    }
+    setLoading(false);
+  }
+
+  async function deleteFloorPlan(index, name) {
+    if (!window.confirm(`"${name}" kat planını silmek istediğinizden emin misiniz?`)) return;
+    const updatedPlans = project.floorPlans.filter((_, i) => i !== index);
+    await updateDoc(doc(db, 'projects', projectId), { floorPlans: updatedPlans });
+    setActiveFloor(0);
+    fetchProject();
+  }
+
+  async function renameFloorPlan(index, newName) {
+    if (!newName.trim()) { setEditingFloorIndex(null); return; }
+    const updatedPlans = project.floorPlans.map((fp, i) =>
+      i === index ? { ...fp, name: newName.trim() } : fp
+    );
+    await updateDoc(doc(db, 'projects', projectId), { floorPlans: updatedPlans });
+    setEditingFloorIndex(null);
+    fetchProject();
+  }
+
+  async function uploadFloorPlan(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const isConfirm = window.confirm('Lütfen kalite kaybını önlemek için telefon ekran görüntüsü (screenshot) yerine doğrudan orijinal PDF veya yüksek çözünürlüklü imaj yükleyin. Devam edilsin mi?');
+    if (!isConfirm) {
+      e.target.value = '';
+      return;
+    }
+
+    const planName = window.prompt('Bu kat planının adını girin (örn: Kat 1, Bahçe):');
+    if (!planName) {
+      e.target.value = '';
+      return;
+    }
+    setUploadingPlan(true);
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('upload_preset', CLOUDINARY_PRESET);
+    try {
+      const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD}/image/upload`, { method: 'POST', body: formData });
+      const data = await res.json();
+      let imageUrl = data.secure_url;
+      if (file.type === 'application/pdf') {
+        imageUrl = data.secure_url
+          .replace('/upload/', '/upload/f_jpg,pg_1/')
+          .replace(/\.pdf$/, '.jpg');
+      }
+      const updatedPlans = [...(project.floorPlans || []), { name: planName.trim(), imageUrl }];
+      await updateDoc(doc(db, 'projects', projectId), { floorPlans: updatedPlans });
+      fetchProject();
+    } catch (err) { alert('Yükleme başarısız'); }
+    setUploadingPlan(false);
+    e.target.value = '';
+  }
+
+  function handleImageClick(e) {
+    if (!canAddPin || !addingPin || newPinCoords) return;
+    const rect = imageRef.current.getBoundingClientRect();
+    const x = ((e.clientX - rect.left) / rect.width) * 100;
+    const y = ((e.clientY - rect.top) / rect.height) * 100;
+    setNewPinCoords({ x, y });
+    e.stopPropagation();
+  }
+
+  const handlePinPointerDown = (e, pin) => {
+    e.stopPropagation();
+    // Yalnızca yöneticiler pini taşıyabilir (veya isterseniz herkes taşıyabilir)
+    const isManager = project.managerId === currentUser?.uid || project.memberRoles?.[currentUser?.uid] === 'manager' || userData?.isSuperAdmin;
+    if (isManager) {
+      setDraggingPin({ id: pin.id, x: pin.x, y: pin.y });
+    }
+  };
+
+  const handlePointerMove = (e) => {
+    if (!draggingPin) return;
+    const rect = imageRef.current.getBoundingClientRect();
+    const clientX = e.clientX || (e.touches && e.touches[0].clientX);
+    const clientY = e.clientY || (e.touches && e.touches[0].clientY);
+    if (!clientX) return;
+
+    let x = ((clientX - rect.left) / rect.width) * 100;
+    let y = ((clientY - rect.top) / rect.height) * 100;
+    x = Math.max(0, Math.min(100, x));
+    y = Math.max(0, Math.min(100, y));
+    setDraggingPin(prev => ({ ...prev, x, y }));
+  };
+
+  const handlePointerUp = async () => {
+    if (draggingPin && draggingPin.x !== undefined) {
+      await updateDoc(doc(db, 'pins', draggingPin.id), { x: draggingPin.x, y: draggingPin.y });
+    }
+    setDraggingPin(null);
+  };
+
+  async function savePin() {
+    if (!newPinData.title || !newPinCoords) return;
+      const docRef = await addDoc(collection(db, 'pins'), {
+        ...newPinData,
+        x: newPinCoords.x,
+        y: newPinCoords.y,
+        projectId,
+        floorPlanIndex: activeFloor,
+        status: 'açık',
+        createdBy: currentUser.uid,
+        createdAt: serverTimestamp(),
+        assignee: newPinData.assignee || ''
+      });
+
+      // Bildirim gönder (Eğer birisi atandıysa ve atanan kişi ben değilsem)
+      if (newPinData.assignee && newPinData.assignee !== userData?.name) {
+        // Find assigned user's ID
+        const membersSnapshot = await getDocs(query(collection(db, 'users'), where('name', '==', newPinData.assignee)));
+        if (!membersSnapshot.empty) {
+          const assignedUser = membersSnapshot.docs[0];
+          await addDoc(collection(db, 'notifications'), {
+            userId: assignedUser.id,
+            projectId: projectId,
+            type: 'assigned',
+            message: `${userData?.name}, sana "${newPinData.title}" adında yeni bir görev (pin) atadı.`,
+            read: false,
+            createdAt: serverTimestamp()
+          });
+        }
+      }
+
+      setAddingPin(false);
+    setNewPinData({ title: '', category: 'genel', assignee: '' });
+    setNewPinCoords(null);
+  }
+
+  async function saveProjectInfo() {
+    await updateDoc(doc(db, 'projects', projectId), projectInfo);
+    setEditingInfo(false);
+    fetchProject();
+  }
+
+  if (loading) return <div className="loading">Yükleniyor...</div>;
+  if (!project) return <div className="loading">Proje bulunamadı.</div>;
+
+  const userRoleInProject = project.memberRoles?.[currentUser?.uid] || 'viewer';
+  const isManager = project.managerId === currentUser?.uid || userRoleInProject === 'manager' || userData?.isSuperAdmin;
+  const canAddPin = isManager;
+  const canManageTeam = isManager;
+  const currentFloorPins = pins.filter(p => {
+    if (p.floorPlanIndex !== activeFloor) return false;
+    
+    // Filtreleme
+    if (pinFilter === 'open' && p.status !== 'açık') return false;
+    if (pinFilter === 'resolved' && p.status !== 'çözüldü') return false;
+    if (pinFilter === 'mine' && p.assignee !== userData?.name) return false;
+
+    // Arama
+    if (pinSearch) {
+      const search = pinSearch.toLowerCase();
+      const titleMatch = p.title?.toLowerCase().includes(search);
+      const assigneeMatch = p.assignee?.toLowerCase().includes(search);
+      if (!titleMatch && !assigneeMatch) return false;
+    }
+
+    return true;
+  });
+
+  const floorPlans = project.floorPlans || [];
+
+  return (
+    <div className="project-detail">
+      <div className="detail-header">
+        <div className="projects-top-left" style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '16px' }} onClick={() => navigate('/')}>
+          <img src="/logo.png" alt="KrokiNet Logo" style={{ width: '48px', height: '48px', borderRadius: '12px', objectFit: 'cover', border: '1px solid var(--border-color)' }} />
+          <div>
+            <h1>{project.name}</h1>
+            <p>{userData?.name} ({userData?.role})</p>
+          </div>
+        </div>
+        <div className="header-actions">
+          <NotificationsDropdown />
+          <button className="btn-secondary" onClick={() => navigate('/profile')} style={{ marginRight: 8 }}>Profilim</button>
+          <button className="btn-secondary" onClick={() => navigate('/')}>Geri Dön</button>
+        </div>
+      </div>
+
+      <div className="detail-tabs">
+        <button className={activeTab === 'plan' ? 'tab active' : 'tab'} onClick={() => setActiveTab('plan')}>
+          <Ruler size={16} style={{ marginRight: '6px' }} /> Kat Planı
+        </button>
+        <button className={activeTab === 'chat' ? 'projects-tab active' : 'projects-tab'}
+          onClick={() => setActiveTab('chat')}>
+          <MessageSquare size={16} style={{ marginRight: '6px' }} /> Genel Sohbet
+        </button>
+        <button className={activeTab === 'info' ? 'projects-tab active' : 'projects-tab'}
+          onClick={() => setActiveTab('info')}>
+          <Info size={16} style={{ marginRight: '6px' }} /> Proje Bilgileri
+        </button>
+        <button className={activeTab === 'team' ? 'tab active' : 'tab'} onClick={() => setActiveTab('team')}>
+          <Users size={16} style={{ marginRight: '6px' }} /> Ekip
+        </button>
+      </div>
+
+      {activeTab === 'plan' && (
+        <div className="plan-view">
+          <div className="floor-tabs">
+            {floorPlans.map((fp, i) => (
+              <div key={i} className="floor-tab-wrapper">
+                <button className={activeFloor === i ? 'floor-tab active' : 'floor-tab'} onClick={() => setActiveFloor(i)}>
+                  {editingFloorIndex === i ? (
+                    <input
+                      className="floor-tab-input"
+                      value={editingFloorName}
+                      onChange={e => setEditingFloorName(e.target.value)}
+                      onBlur={() => renameFloorPlan(i, editingFloorName)}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter') renameFloorPlan(i, editingFloorName);
+                        if (e.key === 'Escape') setEditingFloorIndex(null);
+                      }}
+                      autoFocus
+                    />
+                  ) : (
+                    <span onDoubleClick={() => isManager && setEditingFloorIndex(i)}>{fp.name}</span>
+                  )}
+                </button>
+                {isManager && <button className="floor-tab-delete" onClick={() => deleteFloorPlan(i)}>X</button>}
+              </div>
+            ))}
+          </div>
+
+          <div className="plan-toolbar">
+            {canAddPin && !addingPin && (
+              <button className="btn-primary" onClick={() => setAddingPin(true)}>
+                <MapPin size={16} style={{ marginRight: '6px' }} /> Pin Ekle
+              </button>
+            )}
+            {addingPin && (
+              <div className="pin-form">
+                {!newPinCoords ? (
+                  <span className="pin-hint">👆 Plana tıklayarak konum seçin</span>
+                ) : (
+                  <>
+                    <input placeholder="Pin başlığı *" value={newPinData.title}
+                      onChange={e => setNewPinData({...newPinData, title: e.target.value})} />
+                    <select value={newPinData.category}
+                      onChange={e => setNewPinData({...newPinData, category: e.target.value})}>
+                      {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                    <button className="btn-primary" onClick={savePin}>Kaydet</button>
+                  </>
+                )}
+                <button className="btn-secondary" onClick={() => { setAddingPin(false); setNewPinCoords(null); }}>İptal</button>
+              </div>
+            )}
+            {isManager && (
+              <label className="btn-secondary" style={{ cursor: 'pointer' }}>
+                {uploadingPlan ? 'Yükleniyor...' : '🗺️ Plan Yükle'}
+                <input type="file" hidden accept="image/*,.pdf" onChange={uploadFloorPlan} />
+              </label>
+            )}
+          </div>
+
+          {floorPlans.length === 0 ? (
+            <div className="empty-state">Henüz kat planı yüklenmemiş.</div>
+          ) : (
+            <div style={{ borderRadius: '12px', overflow: 'hidden', border: '1px solid var(--border-color)', position: 'relative' }}>
+              <div style={{ display: 'flex', gap: 10, padding: '16px', alignItems: 'center', background: 'var(--bg-secondary)', borderBottom: '1px solid var(--border-color)' }}>
+                <input 
+                  placeholder="🔍 Pin Ara (Başlık veya Sorumlu)" 
+                  value={pinSearch} 
+                  onChange={e => setPinSearch(e.target.value)}
+                  style={{ flex: 1, padding: '8px 12px', borderRadius: 6, border: '1px solid #cbd5e1', background: 'var(--bg-main)', color: '#fff' }}
+                />
+                <select 
+                  value={pinFilter} 
+                  onChange={e => setPinFilter(e.target.value)}
+                  style={{ padding: '8px 12px', borderRadius: 6, border: '1px solid #cbd5e1', width: 200, background: 'var(--bg-main)', color: '#fff' }}
+                >
+                  <option value="all">Tümü</option>
+                  <option value="open">🔴 Sadece Açıklar</option>
+                  <option value="resolved">🟢 Çözülenler</option>
+                  <option value="mine">👤 Bana Atananlar</option>
+                </select>
+              </div>
+
+              <TransformWrapper
+                initialScale={1}
+                minScale={1}
+                maxScale={10}
+                limitToBounds={true}
+                centerZoomedOut={true}
+                disabled={addingPin && !newPinCoords}
+              >
+                {({ zoomIn, zoomOut, resetTransform }) => (
+                  <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+                    <div className="zoom-controls">
+                      <button className="zoom-btn" onClick={() => zoomIn()}>+</button>
+                      <button className="zoom-btn" onClick={() => zoomOut()}>-</button>
+                      <button className="zoom-btn" onClick={() => resetTransform()}>⟲</button>
+                    </div>
+                    <TransformComponent wrapperStyle={{ width: "100%", height: "70vh", backgroundColor: "var(--bg-main)", cursor: (addingPin && !newPinCoords) ? 'crosshair' : 'grab' }}>
+                      <div
+                        className={`floor-plan-wrapper ${addingPin && !newPinCoords ? 'crosshair' : ''}`}
+                        onClick={handleImageClick}
+                        onMouseMove={handlePointerMove}
+                        onMouseUp={handlePointerUp}
+                        onMouseLeave={handlePointerUp}
+                        onTouchMove={handlePointerMove}
+                        onTouchEnd={handlePointerUp}
+                        ref={imageRef}
+                        style={{ position: 'relative', display: 'flex', justifyContent: 'center', alignItems: 'center', width: '100%', height: '100%' }}
+                      >
+                        <img src={floorPlans[activeFloor]?.imageUrl} alt="Kat Planı" draggable={false} style={{ display: 'block', maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
+                        {currentFloorPins.map(pin => {
+                          const isDragging = draggingPin?.id === pin.id;
+                          const currentX = isDragging ? draggingPin.x : pin.x;
+                          const currentY = isDragging ? draggingPin.y : pin.y;
+                          
+                          return (
+                            <div key={pin.id} className="pin-marker-custom"
+                              style={{ 
+                                left: `${currentX}%`, 
+                                top: `${currentY}%`, 
+                                background: PIN_COLORS[pin.status] || '#F59E0B',
+                                cursor: isDragging ? 'grabbing' : 'grab',
+                                zIndex: isDragging ? 1000 : 10
+                              }}
+                              onMouseDown={e => handlePinPointerDown(e, pin)}
+                              onTouchStart={e => handlePinPointerDown(e, pin)}
+                              onClick={e => { e.stopPropagation(); if(!isDragging) setSelectedPin(pin); }}
+                            >
+                              <div className="pin-tooltip">{pin.title}</div>
+                            </div>
+                          );
+                        })}
+                        {newPinCoords && (
+                          <div className="pin-marker-custom" style={{ left: `${newPinCoords.x}%`, top: `${newPinCoords.y}%`, background: '#F59E0B' }}>
+                            <div className="pin-tooltip">Yeni Pin</div>
+                          </div>
+                        )}
+                      </div>
+                    </TransformComponent>
+                  </div>
+                )}
+              </TransformWrapper>
+            </div>
+          )}
+        </div>
+      )}
+
+      {activeTab === 'chat' && <GeneralChat projectId={projectId} />}
+
+      {activeTab === 'info' && (
+        <div className="info-view">
+          {isManager && !editingInfo && (
+            <button className="btn-primary" onClick={() => setEditingInfo(true)}>✏️ Düzenle</button>
+          )}
+          {editingInfo ? (
+            <div className="info-form">
+              <label>Proje Adı</label>
+              <input value={projectInfo.name || ''} onChange={e => setProjectInfo({...projectInfo, name: e.target.value})} />
+              <label>Açıklama</label>
+              <input value={projectInfo.description || ''} onChange={e => setProjectInfo({...projectInfo, description: e.target.value})} />
+              <label>Adres</label>
+              <input value={projectInfo.address || ''} onChange={e => setProjectInfo({...projectInfo, address: e.target.value})} />
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                <div>
+                  <label>Başlangıç Tarihi</label>
+                  <input type="date" value={projectInfo.startDate || ''} onChange={e => setProjectInfo({...projectInfo, startDate: e.target.value})} />
+                </div>
+                <div>
+                  <label>Hedef Bitiş</label>
+                  <input type="date" value={projectInfo.endDate || ''} onChange={e => setProjectInfo({...projectInfo, endDate: e.target.value})} />
+                </div>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                <div>
+                  <label>Durum</label>
+                  <select value={projectInfo.status || 'devam ediyor'} onChange={e => setProjectInfo({...projectInfo, status: e.target.value})} style={{ width: '100%', padding: '12px 16px', background: 'rgba(0,0,0,0.25)', border: '1.5px solid var(--border-color)', borderRadius: 8, color: 'white' }}>
+                    <option value="planlama">🏗️ Planlama</option>
+                    <option value="devam ediyor">🚧 Devam Ediyor</option>
+                    <option value="duraklatıldı">⏸️ Duraklatıldı</option>
+                    <option value="tamamlandı">✅ Tamamlandı</option>
+                  </select>
+                </div>
+                <div>
+                  <label>İlerleme Yüzdesi (%)</label>
+                  <input type="number" min="0" max="100" value={projectInfo.progress || 0} onChange={e => setProjectInfo({...projectInfo, progress: Number(e.target.value)})} />
+                </div>
+              </div>
+              <label>Genel Notlar</label>
+              <textarea value={projectInfo.notes || ''} onChange={e => setProjectInfo({...projectInfo, notes: e.target.value})} rows={4} />
+              <div className="modal-actions">
+                <button className="btn-primary" onClick={saveProjectInfo}>Kaydet</button>
+                <button className="btn-secondary" onClick={() => setEditingInfo(false)}>İptal</button>
+              </div>
+            </div>
+          ) : (
+            <div className="project-dashboard">
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                <div className="dashboard-card">
+                  <div className="dashboard-card-title">📊 PROJE İLERLEMESİ</div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+                    <span className={`status-label ${project.status?.toLowerCase().replace(' ', '') || 'devamediyor'}`}>{project.status?.toUpperCase() || 'DEVAM EDİYOR'}</span>
+                    <span style={{ fontSize: 28, fontWeight: 800, color: 'var(--primary-color)' }}>%{project.progress || 0}</span>
+                  </div>
+                  <div className="progress-container">
+                    <div className="progress-fill" style={{ width: `${project.progress || 0}%` }}></div>
+                  </div>
+                </div>
+
+                <div className="dashboard-card">
+                  <div className="dashboard-card-title">📋 GENEL BİLGİLER</div>
+                  <div className="dashboard-stat-row">
+                    <span className="dashboard-stat-label">Açıklama</span>
+                    <span className="dashboard-stat-value">{project.description || '-'}</span>
+                  </div>
+                  <div className="dashboard-stat-row">
+                    <span className="dashboard-stat-label">Adres</span>
+                    <span className="dashboard-stat-value">📍 {project.address || '-'}</span>
+                  </div>
+                </div>
+
+                <div className="dashboard-card">
+                  <div className="dashboard-card-title">📝 NOTLAR</div>
+                  <p style={{ fontSize: 14, color: 'var(--text-main)', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>{project.notes || 'Henüz not eklenmemiş.'}</p>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                <div className="dashboard-card">
+                  <div className="dashboard-card-title">📅 ZAMAN ÇİZELGESİ</div>
+                  <div className="timeline-row">
+                    <div className="timeline-date">
+                      <span>Başlangıç</span>
+                      <span>{project.startDate || '-'}</span>
+                    </div>
+                    <span style={{ color: 'var(--text-muted)' }}>→</span>
+                    <div className="timeline-date" style={{ alignItems: 'flex-end' }}>
+                      <span>Hedef Bitiş</span>
+                      <span>{project.endDate || '-'}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {activeTab === 'team' && <ProjectTeam projectId={projectId} isManager={canManageTeam} />}
+
+      {selectedPin && (
+        <PinDetailModal pin={selectedPin} projectId={projectId} isManager={isManager} onClose={() => setSelectedPin(null)} />
+      )}
+    </div>
+  );
+}
