@@ -66,6 +66,18 @@ export default function ProjectDetail() {
     return () => unsub();
   }, [projectId]);
 
+  useEffect(() => {
+    // Proje sayfasındayken yeni bir bildirime tıklanırsa pini aç
+    const pinIdFromUrl = searchParams.get('pin');
+    if (pinIdFromUrl && pins.length > 0) {
+      const targetPin = pins.find(p => p.id === pinIdFromUrl);
+      if (targetPin) {
+        setSelectedPin(targetPin);
+        setSearchParams({}, { replace: true });
+      }
+    }
+  }, [searchParams, pins, setSearchParams]);
+
   async function fetchProject() {
     const snap = await getDoc(doc(db, 'projects', projectId));
     if (snap.exists()) {

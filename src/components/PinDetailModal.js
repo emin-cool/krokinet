@@ -81,7 +81,8 @@ export default function PinDetailModal({ pin, projectId, isManager, onClose }) {
     // Kullanıcı isimlerini metin içinde ara (boşluklu isimler dahil)
     const projectUsers = users.filter(u => u.name && u.name !== 'Herkes' && u.name !== userData?.name);
     for (const userDoc of projectUsers) {
-      if (text.includes(`@${userDoc.name}`)) {
+      const mentionTag = `@${userDoc.name.replace(/\s+/g, '')}`;
+      if (text.includes(mentionTag)) {
         notificationPromises.push(
           addDoc(collection(db, 'notifications'), {
             userId: userDoc.id,
