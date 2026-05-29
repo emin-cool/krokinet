@@ -27,31 +27,40 @@ export default function ProjectTeam({ projectId, isManager }) {
   const [loading, setLoading] = useState(false);
   const [activeSection, setActiveSection] = useState('members');
 
-  useEffect(() => { fetchData(); }, [projectId]);
+  useEffect(() => { 
+    const unsubGroups = onSnapshot(collection(db, 'groups'), snap => {
+      setGroups(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
 
-  async function fetchData() {
-    const groupsSnap = await getDocs(collection(db, 'groups'));
-    const groupsData = groupsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-    setGroups(groupsData);
+    const unsubUsers = onSnapshot(collection(db, 'users'), snap => {
+      setAllUsers(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
 
-    const usersSnap = await getDocs(collection(db, 'users'));
-    const usersData = usersSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-    setAllUsers(usersData);
+    const unsubProject = onSnapshot(doc(db, 'projects', projectId), snap => {
+      if (snap.exists()) {
+        const projectData = { id: snap.id, ...snap.data() };
+        setProject(projectData);
+      }
+    });
 
-    const projectSnap = await getDoc(doc(db, 'projects', projectId));
-    if (projectSnap.exists()) {
-      const projectData = { id: projectSnap.id, ...projectSnap.data() };
-      setProject(projectData);
-      const memberIds = projectData.memberIds || [];
-      setProjectMembers(usersData.filter(u => memberIds.includes(u.id)));
+    return () => {
+      unsubGroups();
+      unsubUsers();
+      unsubProject();
+    };
+  }, [projectId]);
+
+  useEffect(() => {
+    if (project && allUsers.length > 0) {
+      const memberIds = project.memberIds || [];
+      setProjectMembers(allUsers.filter(u => memberIds.includes(u.id)));
     }
-  }
+  }, [project, allUsers]);
 
   async function createGroup() {
     if (!newGroupName.trim()) return;
     await addDoc(collection(db, 'groups'), { name: newGroupName.trim(), createdAt: serverTimestamp() });
     setNewGroupName('');
-    fetchData();
   }
 
   async function createUserAndAdd() {
@@ -86,7 +95,6 @@ export default function ProjectTeam({ projectId, isManager }) {
       await secondaryAuth.signOut();
       setNewUser({ name: '', username: '', password: '', groupId: '', customTitle: '' });
       setSelectedRole('worker');
-      fetchData();
       alert(`Kullanıcı başarıyla oluşturuldu!\n\nKullanıcı Adı: ${autoUsername}\nGeçici Şifre: ${autoPassword}\n\nLütfen bu bilgileri kullanıcıyla paylaşın. Kullanıcı profilinden şifresini değiştirebilir.`);
     } catch (err) { alert('Hata: ' + err.message); }
     setLoading(false);
@@ -97,7 +105,6 @@ export default function ProjectTeam({ projectId, isManager }) {
       memberIds: arrayUnion(userId),
       [`memberRoles.${userId}`]: selectedRole
     });
-    fetchData();
   }
 
   async function removeUser(userId) {
@@ -107,7 +114,6 @@ export default function ProjectTeam({ projectId, isManager }) {
       memberIds: arrayRemove(userId),
       [`memberRoles.${userId}`]: null // Roles will be cleaned up slightly, technically firebase requires deleteField() but null is fine to unset logic
     });
-    fetchData();
   }
 
   const nonMembers = allUsers.filter(u => !u.isSuperAdmin && !(project?.memberIds || []).includes(u.id));

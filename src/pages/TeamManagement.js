@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../firebase';
-import { collection, getDocs, addDoc, deleteDoc, doc, serverTimestamp, setDoc } from 'firebase/firestore';
+import { collection, getDocs, addDoc, deleteDoc, doc, serverTimestamp, setDoc, onSnapshot } from 'firebase/firestore';
 import { initializeApp, getApps } from 'firebase/app';
 import { getAuth, createUserWithEmailAndPassword } from 'firebase/auth';
 
@@ -24,17 +24,20 @@ export default function TeamManagement({ onClose }) {
   const [loading, setLoading] = useState(false);
   const [activeSection, setActiveSection] = useState('groups');
 
-  useEffect(() => { fetchGroups(); fetchUsers(); }, []);
+  useEffect(() => {
+    const unsubGroups = onSnapshot(collection(db, 'groups'), snap => {
+      setGroups(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
 
-  async function fetchGroups() {
-    const snap = await getDocs(collection(db, 'groups'));
-    setGroups(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-  }
+    const unsubUsers = onSnapshot(collection(db, 'users'), snap => {
+      setUsers(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
 
-  async function fetchUsers() {
-    const snap = await getDocs(collection(db, 'users'));
-    setUsers(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-  }
+    return () => {
+      unsubGroups();
+      unsubUsers();
+    };
+  }, []);
 
   async function createGroup() {
     if (!newGroupName.trim()) return;
@@ -43,13 +46,11 @@ export default function TeamManagement({ onClose }) {
       createdAt: serverTimestamp()
     });
     setNewGroupName('');
-    fetchGroups();
   }
 
   async function deleteGroup(groupId) {
     if (!window.confirm('Bu grubu silmek istiyor musunuz?')) return;
     await deleteDoc(doc(db, 'groups', groupId));
-    fetchGroups();
   }
 
   async function createUser() {
@@ -69,7 +70,6 @@ export default function TeamManagement({ onClose }) {
       });
       await secondaryAuth.signOut();
       setNewUser({ name: '', email: '', password: '', groupId: '' });
-      fetchUsers();
       alert('Kullanıcı başarıyla oluşturuldu!');
     } catch (err) {
       alert('Hata: ' + err.message);
