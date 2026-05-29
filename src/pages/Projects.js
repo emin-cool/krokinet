@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { db, auth } from '../firebase';
-import { collection, query, where, getDocs, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, query, where, getDocs, addDoc, serverTimestamp, updateDoc, doc } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
 import { useAuth } from '../contexts/AuthContext';
 import MarketPrices from './MarketPrices';
@@ -15,6 +15,7 @@ export default function Projects() {
   const [showNewProject, setShowNewProject] = useState(false);
   const [newProject, setNewProject] = useState({ name: '', description: '', address: '' });
   const [activeSection, setActiveSection] = useState('projects');
+  const [projectTab, setProjectTab] = useState('active');
   const { currentUser, userData } = useAuth();
   const navigate = useNavigate();
 
@@ -42,7 +43,8 @@ export default function Projects() {
       managerId: currentUser.uid,
       memberIds: [currentUser.uid],
       createdAt: serverTimestamp(),
-      floorPlans: []
+      floorPlans: [],
+      isArchived: false
     });
     setShowNewProject(false);
     setNewProject({ name: '', description: '', address: '' });
@@ -111,15 +113,48 @@ export default function Projects() {
             </div>
           )}
 
+          {/* Sub-tabs for Active vs Archived Projects */}
+          <div style={{ display: 'flex', gap: '16px', marginBottom: '20px', borderBottom: '1px solid var(--border-color)', paddingBottom: '10px' }}>
+            <button 
+              onClick={() => setProjectTab('active')}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '15px', fontWeight: projectTab === 'active' ? 600 : 400, color: projectTab === 'active' ? 'var(--primary-color)' : 'var(--text-muted)' }}
+            >
+              Aktif Projeler
+            </button>
+            <button 
+              onClick={() => setProjectTab('archived')}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '15px', fontWeight: projectTab === 'archived' ? 600 : 400, color: projectTab === 'archived' ? 'var(--primary-color)' : 'var(--text-muted)' }}
+            >
+              Arşivlenenler
+            </button>
+          </div>
+
           <div className="projects-grid">
-            {projects.length === 0 ? (
+            {(projectTab === 'active' ? projects.filter(p => !p.isArchived) : projects.filter(p => p.isArchived)).length === 0 ? (
               <div className="empty-state">Henüz proje yok.</div>
             ) : (
-              projects.map(project => (
-                <div key={project.id} className="project-card"
+              (projectTab === 'active' ? projects.filter(p => !p.isArchived) : projects.filter(p => p.isArchived)).map(project => (
+                <div key={project.id} className="project-card" style={{ position: 'relative' }}
                   onClick={() => navigate(`/project/${project.id}`)}>
-                  <div className="project-icon" style={{ background: 'rgba(59, 130, 246, 0.1)' }}>
-                    <Building2 size={28} color="var(--primary-color)" />
+                  
+                  {/* Archive Button */}
+                  {(userData?.isSuperAdmin || project.managerId === currentUser.uid) && (
+                    <button 
+                      onClick={async (e) => {
+                        e.stopPropagation();
+                        if (window.confirm(`Projeyi ${projectTab === 'active' ? 'arşivlemek' : 'aktif hale getirmek'} istediğinize emin misiniz?`)) {
+                          await updateDoc(doc(db, 'projects', project.id), { isArchived: !project.isArchived });
+                          fetchProjects();
+                        }
+                      }}
+                      style={{ position: 'absolute', top: 12, right: 12, padding: '4px 8px', borderRadius: 6, border: 'none', background: 'var(--bg-card-hover)', cursor: 'pointer', fontSize: 12 }}
+                    >
+                      {projectTab === 'active' ? 'Arşivle' : 'Geri Al'}
+                    </button>
+                  )}
+
+                  <div className="project-icon" style={{ background: project.isArchived ? '#f3f4f6' : 'rgba(59, 130, 246, 0.1)' }}>
+                    <Building2 size={28} color={project.isArchived ? '#9ca3af' : 'var(--primary-color)'} />
                   </div>
                   <h3>{project.name}</h3>
                   <p>{project.description}</p>

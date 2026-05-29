@@ -32,6 +32,8 @@ export default function ProjectDetail() {
 
   const [draggingPin, setDraggingPin] = useState(null);
   const [movingPinId, setMovingPinId] = useState(null);
+  const [showArchivedPins, setShowArchivedPins] = useState(false);
+  const [showArchivedPlans, setShowArchivedPlans] = useState(false);
 
   const [selectedPin, setSelectedPin] = useState(null);
   const [addingPin, setAddingPin] = useState(false);
@@ -47,7 +49,7 @@ export default function ProjectDetail() {
   useEffect(() => {
     fetchProject();
     const unsub = onSnapshot(
-      query(collection(db, 'pins'), where('projectId', '==', projectId), where('isArchived', '==', false)),
+      query(collection(db, 'pins'), where('projectId', '==', projectId)),
       snap => {
         const loadedPins = snap.docs.map(d => ({ id: d.id, ...d.data() }));
         setPins(loadedPins);
@@ -137,6 +139,22 @@ export default function ProjectDetail() {
     } catch (error) {
       console.error("Kat silinirken hata:", error);
       alert("Silme işlemi sırasında bir hata oluştu.");
+    }
+  }
+
+  async function toggleArchiveFloorPlan(index, currentStatus) {
+    if (!window.confirm(`Kat planını ${currentStatus ? 'arşivden çıkarmak' : 'arşivlemek'} istediğinize emin misiniz?`)) return;
+    try {
+      const updatedPlans = [...project.floorPlans];
+      updatedPlans[index] = { ...updatedPlans[index], isArchived: !currentStatus };
+      await updateDoc(doc(db, 'projects', projectId), { floorPlans: updatedPlans });
+      if (!currentStatus && activeFloor === index) {
+        setActiveFloor(0);
+      }
+      fetchProject();
+    } catch (error) {
+      console.error("Hata:", error);
+      alert("İşlem sırasında bir hata oluştu.");
     }
   }
 
@@ -289,6 +307,8 @@ export default function ProjectDetail() {
       const assigneeMatch = p.assignee?.toLowerCase().includes(search);
       if (!titleMatch && !assigneeMatch) return false;
     }
+    
+    if (!showArchivedPins && p.isArchived) return false;
 
     return true;
   });
@@ -331,10 +351,20 @@ export default function ProjectDetail() {
 
       {activeTab === 'plan' && (
         <div className="plan-view">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+            <button 
+              onClick={() => setShowArchivedPlans(!showArchivedPlans)}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: showArchivedPlans ? 'var(--primary-color)' : 'var(--text-muted)', fontSize: '13px', fontWeight: 500, padding: '4px 8px' }}
+            >
+              {showArchivedPlans ? 'Arşivlenen Planları Gizle' : 'Arşivlenen Planları Göster'}
+            </button>
+          </div>
           <div className="floor-tabs">
-            {floorPlans.map((fp, i) => (
+            {floorPlans.map((fp, i) => {
+              if (fp.isArchived && !showArchivedPlans) return null;
+              return (
               <div key={i} className="floor-tab-wrapper">
-                <button className={activeFloor === i ? 'floor-tab active' : 'floor-tab'} onClick={() => setActiveFloor(i)}>
+                <button className={activeFloor === i ? 'floor-tab active' : 'floor-tab'} onClick={() => setActiveFloor(i)} style={{ opacity: fp.isArchived ? 0.6 : 1, filter: fp.isArchived ? 'grayscale(100%)' : 'none' }}>
                   {editingFloorIndex === i ? (
                     <input
                       className="floor-tab-input"
@@ -348,20 +378,39 @@ export default function ProjectDetail() {
                       autoFocus
                     />
                   ) : (
-                    <span onDoubleClick={() => isManager && setEditingFloorIndex(i)}>{fp.name}</span>
+                    <span onDoubleClick={() => isManager && setEditingFloorIndex(i)}>
+                      {fp.name} {fp.isArchived && '(Arşiv)'}
+                    </span>
                   )}
                 </button>
-                {isManager && <button className="floor-tab-delete" onClick={() => deleteFloorPlan(i)}>X</button>}
+                {isManager && (
+                  <div style={{ display: 'flex' }}>
+                    <button className="floor-tab-delete" onClick={() => toggleArchiveFloorPlan(i, fp.isArchived)} style={{ color: '#4b5563', padding: '0 4px' }} title={fp.isArchived ? 'Arşivden Çıkar' : 'Arşivle'}>
+                      📦
+                    </button>
+                    <button className="floor-tab-delete" onClick={() => deleteFloorPlan(i, fp.name)}>X</button>
+                  </div>
+                )}
               </div>
-            ))}
+            )})}
           </div>
 
           <div className="plan-toolbar">
-            {canAddPin && !addingPin && (
-              <button className="btn-primary" onClick={() => setAddingPin(true)}>
-                <MapPin size={16} style={{ marginRight: '6px' }} /> Pin Ekle
-              </button>
-            )}
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                {project.floorPlans && project.floorPlans.length > 0 && (
+                  <button 
+                    onClick={() => setShowArchivedPins(!showArchivedPins)}
+                    style={{ background: showArchivedPins ? 'var(--primary-color)' : 'white', color: showArchivedPins ? 'white' : 'var(--text-muted)', border: '1px solid #e2e8f0', padding: '6px 12px', borderRadius: 8, fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, transition: 'all 0.2s' }}
+                  >
+                    📦 {showArchivedPins ? 'Arşivi Gizle' : 'Arşivi Göster'}
+                  </button>
+                )}
+                {isManager && project.floorPlans && project.floorPlans.length > 0 && (
+                  <button className="btn-primary" onClick={() => setAddingPin(!addingPin)}>
+                    {addingPin ? '✕ İptal' : '📍 Yeni Pin (Sorun/İş)'}
+                  </button>
+                )}
+              </div>
             {addingPin && (
               <div className="pin-form">
                 {!newPinCoords ? (
@@ -449,7 +498,9 @@ export default function ProjectDetail() {
                               style={{ 
                                 left: `${currentX}%`, 
                                 top: `${currentY}%`, 
-                                background: PIN_COLORS[pin.status] || '#F59E0B',
+                                background: pin.isArchived ? '#9ca3af' : (PIN_COLORS[pin.status] || '#F59E0B'),
+                                opacity: pin.isArchived ? 0.7 : 1,
+                                filter: pin.isArchived ? 'grayscale(100%)' : 'none',
                                 cursor: movingPinId === pin.id ? (isDragging ? 'grabbing' : 'grab') : 'pointer',
                                 zIndex: isDragging ? 1000 : 10,
                                 animation: movingPinId === pin.id && !isDragging ? 'pulse 1s infinite' : 'none',

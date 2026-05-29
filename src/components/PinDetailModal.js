@@ -204,6 +204,11 @@ export default function PinDetailModal({ pin, projectId, isManager, onClose }) {
     onClose();
   }
 
+  async function unarchivePin() {
+    await updateDoc(doc(db, 'pins', pin.id), { isArchived: false });
+    // Keep it open, no need to close
+  }
+
   async function deleteMessage(msgId) {
     if (window.confirm('Bu mesajı silmek istediğinize emin misiniz?')) {
       await deleteDoc(doc(db, 'messages', msgId));
@@ -262,10 +267,15 @@ export default function PinDetailModal({ pin, projectId, isManager, onClose }) {
             <h2 style={{ display: 'flex', alignItems: 'center' }}>
               <MapPin size={24} color="var(--primary-color)" style={{ marginRight: '8px' }} /> {pin.title}
             </h2>
-            <span className="pin-category">{pin.category}</span>
+            <span className="pin-category">{pin.category} {pin.isArchived ? '(Arşivlenmiş)' : ''}</span>
           </div>
           <div className="pin-header-actions">
-            {isManager && <button className="btn-danger" onClick={deletePin}><Trash2 size={18} /></button>}
+            {isManager && pin.isArchived && (
+              <button className="btn-secondary" onClick={unarchivePin} style={{ marginRight: 8, fontSize: 13 }}>
+                📦 Arşivden Çıkar
+              </button>
+            )}
+            {isManager && !pin.isArchived && <button className="btn-danger" onClick={deletePin}><Trash2 size={18} /></button>}
             <button className="btn-secondary" onClick={onClose} style={{ padding: '8px 12px' }}>✕</button>
           </div>
         </div>
