@@ -1,0 +1,48 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Basic function to check if logged in
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    match /users/{userId} {
+      // Any signed in user can read the user list
+      allow read: if isSignedIn();
+      // Only the user themselves or a superAdmin can edit their profile (Simplified for MVP)
+      allow write: if isSignedIn(); 
+    }
+
+    match /groups/{groupId} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn();
+    }
+
+    match /projects/{projectId} {
+      // Anyone can read if they are in memberIds, or if they just need to list it
+      // For MVP, we'll allow any signed-in user to read so Dashboard populates, 
+      // but you can restrict it in production to: `if isSignedIn() && request.auth.uid in resource.data.memberIds`
+      allow read: if isSignedIn();
+      allow write: if isSignedIn();
+    }
+
+    match /pins/{pinId} {
+      allow read, write: if isSignedIn();
+    }
+
+    match /messages/{messageId} {
+      allow read, write: if isSignedIn();
+    }
+
+    match /files/{fileId} {
+      allow read, write: if isSignedIn();
+    }
+
+    match /notifications/{notificationId} {
+      // Users can only read their own notifications
+      allow read: if isSignedIn() && resource.data.userId == request.auth.uid;
+      // Anyone can write a notification
+      allow write: if isSignedIn();
+    }
+  }
+}

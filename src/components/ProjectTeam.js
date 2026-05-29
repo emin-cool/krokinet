@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../firebase';
-import { collection, getDocs, addDoc, doc, setDoc, serverTimestamp, updateDoc, arrayUnion, arrayRemove, getDoc, onSnapshot } from 'firebase/firestore';
+import { collection, getDocs, addDoc, doc, setDoc, serverTimestamp, updateDoc, arrayUnion, arrayRemove, getDoc, onSnapshot, query, limit } from 'firebase/firestore';
 import { initializeApp, getApps } from 'firebase/app';
 import { getAuth, createUserWithEmailAndPassword } from 'firebase/auth';
 
@@ -28,11 +28,13 @@ export default function ProjectTeam({ projectId, isManager }) {
   const [activeSection, setActiveSection] = useState('members');
 
   useEffect(() => { 
-    const unsubGroups = onSnapshot(collection(db, 'groups'), snap => {
+    const qGroups = query(collection(db, 'groups'), limit(100));
+    const unsubGroups = onSnapshot(qGroups, snap => {
       setGroups(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     });
 
-    const unsubUsers = onSnapshot(collection(db, 'users'), snap => {
+    const qUsers = query(collection(db, 'users'), limit(500));
+    const unsubUsers = onSnapshot(qUsers, snap => {
       setAllUsers(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     });
 
@@ -85,8 +87,7 @@ export default function ProjectTeam({ projectId, isManager }) {
         email,
         role: finalTitle,
         groupId: newUser.groupId,
-        isSuperAdmin: false,
-        tempPassword: autoPassword
+        isSuperAdmin: false
       });
       await updateDoc(doc(db, 'projects', projectId), {
         memberIds: arrayUnion(uid),

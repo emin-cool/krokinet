@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../firebase';
-import { collection, getDocs, addDoc, deleteDoc, doc, serverTimestamp, setDoc, onSnapshot } from 'firebase/firestore';
+import { collection, getDocs, addDoc, deleteDoc, doc, serverTimestamp, setDoc, onSnapshot, query, limit } from 'firebase/firestore';
 import { initializeApp, getApps } from 'firebase/app';
 import { getAuth, createUserWithEmailAndPassword } from 'firebase/auth';
 
@@ -25,11 +25,13 @@ export default function TeamManagement({ onClose }) {
   const [activeSection, setActiveSection] = useState('groups');
 
   useEffect(() => {
-    const unsubGroups = onSnapshot(collection(db, 'groups'), snap => {
+    const qGroups = query(collection(db, 'groups'), limit(100));
+    const unsubGroups = onSnapshot(qGroups, snap => {
       setGroups(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     });
 
-    const unsubUsers = onSnapshot(collection(db, 'users'), snap => {
+    const qUsers = query(collection(db, 'users'), limit(500));
+    const unsubUsers = onSnapshot(qUsers, snap => {
       setUsers(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     });
 

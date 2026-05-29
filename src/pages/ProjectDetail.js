@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { db } from '../firebase';
-import { doc, getDoc, collection, query, where, addDoc, serverTimestamp, onSnapshot, updateDoc, getDocs } from 'firebase/firestore';
+import { doc, getDoc, collection, query, where, addDoc, serverTimestamp, onSnapshot, updateDoc, getDocs, writeBatch, deleteDoc } from 'firebase/firestore';
 import { useAuth } from '../contexts/AuthContext';
 import PinDetailModal from '../components/PinDetailModal';
 import GeneralChat from '../components/GeneralChat';
@@ -89,11 +89,55 @@ export default function ProjectDetail() {
   }
 
   async function deleteFloorPlan(index, name) {
-    if (!window.confirm(`"${name}" kat planını silmek istediğinizden emin misiniz?`)) return;
-    const updatedPlans = project.floorPlans.filter((_, i) => i !== index);
-    await updateDoc(doc(db, 'projects', projectId), { floorPlans: updatedPlans });
-    setActiveFloor(0);
-    fetchProject();
+    if (!window.confirm(`"${name}" kat planını sildiğinizde bu plana ait TÜM PİNLER, MESAJLAR VE DOSYALAR geri döndürülemez şekilde silinecektir. Emin misiniz?`)) return;
+    
+    try {
+      // Find all pins on this floor
+      const qPins = query(collection(db, 'pins'), where('projectId', '==', projectId), where('floorIndex', '==', index));
+      const pinsSnap = await getDocs(qPins);
+      
+      const batch = writeBatch(db);
+      
+      for (const pinDoc of pinsSnap.docs) {
+        // Fetch and delete messages
+        const qMessages = query(collection(db, 'messages'), where('pinId', '==', pinDoc.id));
+        const messagesSnap = await getDocs(qMessages);
+        messagesSnap.docs.forEach(m => batch.delete(m.ref));
+        
+        // Fetch and delete files
+        const qFiles = query(collection(db, 'files'), where('pinId', '==', pinDoc.id));
+        const filesSnap = await getDocs(qFiles);
+        filesSnap.docs.forEach(f => batch.delete(f.ref));
+        
+        // Delete the pin itself
+        batch.delete(pinDoc.ref);
+      }
+      
+      // Commit the batch delete
+      await batch.commit();
+
+      // Update the floor plan array in the project
+      const updatedPlans = project.floorPlans.filter((_, i) => i !== index);
+      // We must also decrement floorIndex for pins on floors above this one to keep references valid!
+      // This is necessary because array elements shift down.
+      const qAllPins = query(collection(db, 'pins'), where('projectId', '==', projectId));
+      const allPinsSnap = await getDocs(qAllPins);
+      const shiftBatch = writeBatch(db);
+      allPinsSnap.docs.forEach(p => {
+        const pData = p.data();
+        if (pData.floorIndex > index) {
+          shiftBatch.update(p.ref, { floorIndex: pData.floorIndex - 1 });
+        }
+      });
+      await shiftBatch.commit();
+      
+      await updateDoc(doc(db, 'projects', projectId), { floorPlans: updatedPlans });
+      setActiveFloor(0);
+      fetchProject();
+    } catch (error) {
+      console.error("Kat silinirken hata:", error);
+      alert("Silme işlemi sırasında bir hata oluştu.");
+    }
   }
 
   async function renameFloorPlan(index, newName) {
