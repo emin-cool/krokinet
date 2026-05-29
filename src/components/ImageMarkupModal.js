@@ -102,7 +102,7 @@ export default function ImageMarkupModal({ imageUrl, onSave, onCancel }) {
   };
 
   return (
-    <div className="modal-overlay" style={{ zIndex: 3000, background: 'rgba(0,0,0,0.8)' }}>
+    <div className="modal-overlay" onClick={e => e.stopPropagation()} style={{ zIndex: 3000, background: 'rgba(0,0,0,0.8)' }}>
       <div className="pin-modal" style={{ maxWidth: '800px', width: '90%' }}>
         <div className="pin-modal-header" style={{ borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
           <h4 style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>

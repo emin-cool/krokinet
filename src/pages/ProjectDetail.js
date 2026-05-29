@@ -214,9 +214,9 @@ export default function ProjectDetail() {
   }
 
   const handlePinPointerDown = (e, pin) => {
-    e.stopPropagation();
     // Sadece taşıma modu aktifse sürüklemeye izin ver
     if (movingPinId === pin.id) {
+      e.stopPropagation();
       setDraggingPin({ id: pin.id, x: pin.x, y: pin.y });
     }
   };
@@ -508,7 +508,8 @@ export default function ProjectDetail() {
                               }}
                               onMouseDown={e => handlePinPointerDown(e, pin)}
                               onTouchStart={e => handlePinPointerDown(e, pin)}
-                              onClick={e => { e.stopPropagation(); if (!movingPinId) setSelectedPin(pin); }}
+                              onClick={e => { e.stopPropagation(); if (!movingPinId && !isDragging) setSelectedPin(pin); }}
+                              onTouchEnd={e => { if (!movingPinId && !isDragging) { e.stopPropagation(); setSelectedPin(pin); } }}
                             >
                               <div className="pin-tooltip">
                                 {pin.title}
