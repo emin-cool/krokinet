@@ -9,7 +9,7 @@ import ProjectGallery from '../components/ProjectGallery';
 import ProjectTeam from '../components/ProjectTeam';
 import NotificationsDropdown from '../components/NotificationsDropdown';
 import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
-import { Building, Ruler, MessageSquare, Info, Users, MapPin, Archive } from 'lucide-react';
+import { Building, Ruler, MessageSquare, Info, Users, MapPin, Archive, ArrowLeft } from 'lucide-react';
 
 const PIN_COLORS = { 'açık': '#ef4444', 'devam ediyor': '#f59e0b', 'çözüldü': '#22c55e' };
 const CATEGORY_COLORS = {
@@ -354,18 +354,27 @@ export default function ProjectDetail() {
 
   return (
     <div className="project-detail">
-      <div className="detail-header">
-        <div className="projects-top-left" style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '16px' }} onClick={() => navigate('/')}>
-          <img src="/logo.png" alt="Şanti Logo" style={{ width: '48px', height: '48px', borderRadius: '12px', objectFit: 'cover', border: '1px solid var(--border-color)' }} />
-          <div>
-            <h1>{project.name}</h1>
-            <p>{userData?.name} ({userData?.role})</p>
+      <div className="detail-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 24px', background: 'var(--bg-surface)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', borderBottom: '1px solid var(--border-color)', position: 'sticky', top: 0, zIndex: 100 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+          <button 
+            onClick={() => navigate('/')}
+            style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 40, height: 40, borderRadius: '50%', background: 'var(--bg-card-hover)', border: 'none', cursor: 'pointer', transition: 'all 0.2s', color: 'var(--text-main)' }}
+            className="back-btn-hover"
+            title="Geri Dön"
+          >
+            <ArrowLeft size={20} />
+          </button>
+          <div className="projects-top-left" style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '16px' }} onClick={() => navigate('/')}>
+            <img src="/logo.png" alt="Şanti Logo" style={{ width: '48px', height: '48px', borderRadius: '12px', objectFit: 'cover', border: '1px solid var(--border-color)', boxShadow: 'var(--shadow-sm)' }} />
+            <div>
+              <h1 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 700, color: 'var(--text-main)' }}>{project.name}</h1>
+              <p style={{ margin: 0, fontSize: '0.875rem', color: 'var(--text-muted)' }}>{userData?.name} ({userData?.role})</p>
+            </div>
           </div>
         </div>
-        <div className="header-actions">
+        <div className="header-actions" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           <NotificationsDropdown />
-          <button className="btn-secondary" onClick={() => navigate('/profile')} style={{ marginRight: 8 }}>Profilim</button>
-          <button className="btn-secondary" onClick={() => navigate('/')}>Geri Dön</button>
+          <button className="btn-secondary" onClick={() => navigate('/profile')} style={{ borderRadius: '20px', padding: '8px 16px', fontWeight: 600 }}>Profilim</button>
         </div>
       </div>
 

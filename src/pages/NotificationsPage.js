@@ -3,7 +3,7 @@ import { db } from '../firebase';
 import { collection, query, where, orderBy, onSnapshot, doc, updateDoc, deleteDoc, limit } from 'firebase/firestore';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import { MessageSquare, MapPin, Check } from 'lucide-react';
+import { MessageSquare, MapPin, Check, ArrowLeft } from 'lucide-react';
 import SwipeableItem from '../components/SwipeableItem';
 
 export default function NotificationsPage() {
@@ -48,10 +48,20 @@ export default function NotificationsPage() {
 
   return (
     <div className="projects-page" style={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
-      <div className="projects-top-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div>
-          <h1>Bildirimler</h1>
-          <p>Son gelişmeler</p>
+      <div className="detail-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 24px', background: 'var(--bg-surface)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', borderBottom: '1px solid var(--border-color)', position: 'sticky', top: 0, zIndex: 100 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+          <button 
+            onClick={() => navigate('/')}
+            style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 40, height: 40, borderRadius: '50%', background: 'var(--bg-card-hover)', border: 'none', cursor: 'pointer', transition: 'all 0.2s', color: 'var(--text-main)' }}
+            className="back-btn-hover"
+            title="Geri Dön"
+          >
+            <ArrowLeft size={20} />
+          </button>
+          <div>
+            <h1 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 700, color: 'var(--text-main)' }}>Bildirimler</h1>
+            <p style={{ margin: 0, fontSize: '0.875rem', color: 'var(--text-muted)' }}>Son gelişmeler</p>
+          </div>
         </div>
         {notifications.some(n => !n.read) && (
           <button onClick={markAllAsRead} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
