@@ -30,9 +30,9 @@ export default function Login() {
     <div className="login-container">
       <div className="login-box">
         <div className="login-logo" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
-          <img src="/logo.png" alt="KrokiNet Logo" style={{ width: '80px', height: '80px', borderRadius: '16px', objectFit: 'cover' }} />
+          <img src="/logo.png" alt="Şanti Logo" style={{ width: '80px', height: '80px', borderRadius: '16px', objectFit: 'cover' }} />
         </div>
-        <h1>KrokiNet</h1>
+        <h1>Şanti</h1>
         <p>Hesabınıza giriş yapın</p>
         {error && <div className="error-msg">{error}</div>}
         <form onSubmit={handleSubmit}>

@@ -2,27 +2,26 @@
 @import url('./premium-plan.css');
 
 :root {
-  /* Clean Professional SaaS Dark Palette */
-  --bg-main: #020617; /* Slate 950 */
-  --bg-surface: #0f172a; /* Slate 900 */
-  --bg-card: #1e293b; /* Slate 800 */
-  --bg-card-hover: #334155; /* Slate 700 */
+  /* Clean Professional SaaS Light Palette */
+  --bg-main: #f8fafc;
+  --bg-surface: #ffffff;
+  --bg-card: #ffffff;
+  --bg-card-hover: #f1f5f9;
   
-  --primary-color: #3b82f6; /* Blue 500 */
+  --primary-color: #3b82f6;
   --primary-gradient: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
   --primary-hover: linear-gradient(135deg, #60a5fa 0%, #3b82f6 100%);
   
-  --secondary-color: #475569;
-  --secondary-gradient: linear-gradient(135deg, #334155 0%, #1e293b 100%);
+  --secondary-color: #cbd5e1;
+  --secondary-gradient: linear-gradient(135deg, #e2e8f0 0%, #cbd5e1 100%);
   
-  --border-color: #334155;
-  --border-hover: #475569;
+  --border-color: #e2e8f0;
+  --border-hover: #cbd5e1;
   --border-focus: #3b82f6;
   
-  --text-main: #f8fafc; /* Slate 50 */
-  --text-muted: #94a3b8; /* Slate 400 */
+  --text-main: #0f172a;
+  --text-muted: #64748b;
   --text-inverse: #ffffff;
-  
   --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
   --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
   --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
@@ -36,6 +35,22 @@
   --radius-md: 8px;
   --radius-lg: 12px;
   --radius-xl: 16px;
+}
+
+[data-theme="dark"] {
+  --bg-main: #020617;
+  --bg-surface: #0f172a;
+  --bg-card: #1e293b;
+  --bg-card-hover: #334155;
+  
+  --secondary-color: #475569;
+  --secondary-gradient: linear-gradient(135deg, #334155 0%, #1e293b 100%);
+  
+  --border-color: #334155;
+  --border-hover: #475569;
+  
+  --text-main: #f8fafc;
+  --text-muted: #94a3b8;
 }
 
 /* Global Reset & Base */
@@ -1951,5 +1966,152 @@ body {
   }
   .login-box {
     padding: 36px 24px;
+  }
+}
+
+/* MOBILE UI UX IMPROVEMENTS */
+/* 1. Bottom Navigation Bar */
+.bottom-nav {
+  display: none;
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 65px;
+  background-color: var(--bg-surface);
+  border-top: 1px solid var(--border-color);
+  z-index: 1000;
+  padding-bottom: env(safe-area-inset-bottom);
+  box-shadow: 0 -2px 10px rgba(0,0,0,0.05);
+}
+
+.bottom-nav-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 500;
+  gap: 4px;
+}
+
+.bottom-nav-item.active {
+  color: var(--primary-color);
+}
+
+.bottom-nav-badge {
+  position: absolute;
+  top: -4px;
+  right: -8px;
+  background-color: var(--danger-color);
+  color: white;
+  border-radius: 50%;
+  padding: 2px 6px;
+  font-size: 10px;
+  font-weight: bold;
+}
+
+/* 2. Floating Action Button (FAB) */
+.fab-button {
+  display: none !important;
+}
+
+/* 3. Bottom Sheet Modal */
+.bottom-sheet-modal {
+  background-color: var(--bg-surface);
+  color: var(--text-main);
+  padding: 24px;
+  border-radius: 20px 20px 0 0; /* Only top rounded */
+  width: 100%;
+  max-width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+  position: absolute;
+  bottom: 0;
+  animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes slideUp {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+
+.bottom-sheet-handle {
+  display: none;
+  width: 40px;
+  height: 4px;
+  background-color: var(--border-color);
+  border-radius: 2px;
+  margin: -10px auto 20px;
+}
+
+/* Media Queries for Mobile UX */
+@media (max-width: 768px) {
+  /* Activate Bottom Nav */
+  .bottom-nav {
+    display: flex;
+  }
+  
+  /* Add padding to bottom so content is not hidden by Bottom Nav */
+  body {
+    padding-bottom: 65px;
+  }
+  
+  /* Hide NotificationsDropdown from Top Header since it's in Bottom Nav now */
+  .notifications-wrapper {
+    display: none !important;
+  }
+
+  /* Activate FAB */
+  .fab-button {
+    display: flex !important;
+    position: fixed;
+    bottom: 85px; /* Above bottom nav */
+    right: 20px;
+    width: 56px;
+    height: 56px;
+    border-radius: 28px;
+    background-color: var(--primary-color);
+    color: white;
+    box-shadow: 0 4px 14px rgba(59, 130, 246, 0.4);
+    align-items: center;
+    justify-content: center;
+    z-index: 990;
+    border: none;
+    cursor: pointer;
+  }
+  
+  /* Hide standard new pin button on mobile */
+  .desktop-new-pin-btn {
+    display: none !important;
+  }
+  
+  /* Transform Modal to Bottom Sheet */
+  .modal-content, .pin-modal, .team-modal {
+    border-radius: 20px 20px 0 0 !important;
+    position: absolute !important;
+    bottom: 0 !important;
+    margin: 0 !important;
+    width: 100% !important;
+    animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) !important;
+    padding: 24px 20px !important;
+  }
+  
+  .bottom-sheet-handle {
+    display: block;
+  }
+  
+  /* Align modals overlay for bottom alignment */
+  .modal-overlay {
+    align-items: flex-end !important;
+    padding: 0 !important;
+  }
+  
+  /* Touch Targets (Buttons, Inputs) should be at least 44px tall */
+  .btn-primary, .btn-secondary, .btn-danger, input, select {
+    min-height: 44px;
   }
 }

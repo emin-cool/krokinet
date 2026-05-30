@@ -12,7 +12,17 @@ import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
 import { Building, Ruler, MessageSquare, Info, Users, MapPin } from 'lucide-react';
 
 const PIN_COLORS = { 'açık': '#ef4444', 'devam ediyor': '#f59e0b', 'çözüldü': '#22c55e' };
-const CATEGORIES = ['yapısal', 'elektrik', 'tesisat', 'genel'];
+const CATEGORY_COLORS = {
+  'yapısal': '#ef4444', 
+  'elektrik': '#eab308', 
+  'tesisat': '#22c55e', 
+  'mekanik': '#f97316', 
+  'mimari': '#a855f7', 
+  'genel': '#3b82f6', 
+  'diğer': '#64748b'
+};
+const CATEGORIES = Object.keys(CATEGORY_COLORS);
+
 const CLOUDINARY_CLOUD = 'dcx4qribb';
 const CLOUDINARY_PRESET = 'insaat-upload';
 
@@ -29,6 +39,7 @@ export default function ProjectDetail() {
   const [activeFloor, setActiveFloor] = useState(0);
   const [pinSearch, setPinSearch] = useState('');
   const [pinFilter, setPinFilter] = useState('all');
+  const [categoryFilter, setCategoryFilter] = useState('all');
 
   const [draggingPin, setDraggingPin] = useState(null);
   const [movingPinId, setMovingPinId] = useState(null);
@@ -37,10 +48,11 @@ export default function ProjectDetail() {
 
   const [selectedPin, setSelectedPin] = useState(null);
   const [addingPin, setAddingPin] = useState(false);
-  const [newPinData, setNewPinData] = useState({ title: '', category: 'genel' });
+  const [newPinData, setNewPinData] = useState({ title: '', category: 'genel', color: '#3b82f6' });
   const [newPinCoords, setNewPinCoords] = useState(null);
   const [loading, setLoading] = useState(true);
   const [uploadingPlan, setUploadingPlan] = useState(false);
+  const [uploadingProjectFile, setUploadingProjectFile] = useState(false);
   const [editingInfo, setEditingInfo] = useState(false);
   const [projectInfo, setProjectInfo] = useState({});
   const [editingFloorIndex, setEditingFloorIndex] = useState(null);
@@ -204,6 +216,26 @@ export default function ProjectDetail() {
     e.target.value = '';
   }
 
+  async function uploadProjectFile(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    setUploadingProjectFile(true);
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('upload_preset', CLOUDINARY_PRESET);
+    try {
+      const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD}/auto/upload`, { method: 'POST', body: formData });
+      const data = await res.json();
+      const fileUrl = data.secure_url;
+      const updatedFiles = [...(project.projectFiles || []), { name: file.name, url: fileUrl }];
+      await updateDoc(doc(db, 'projects', projectId), { projectFiles: updatedFiles });
+      fetchProject();
+    } catch (err) { alert('Dosya yükleme başarısız'); }
+    setUploadingProjectFile(false);
+    e.target.value = '';
+  }
+
   function handleImageClick(e) {
     if (!canAddPin || !addingPin || newPinCoords) return;
     const rect = imageRef.current.getBoundingClientRect();
@@ -252,6 +284,7 @@ export default function ProjectDetail() {
         projectId,
         floorPlanIndex: activeFloor,
         status: 'açık',
+        color: CATEGORY_COLORS[newPinData.category] || '#3b82f6',
         createdBy: currentUser.uid,
         createdAt: serverTimestamp(),
         assignee: newPinData.assignee || ''
@@ -299,6 +332,7 @@ export default function ProjectDetail() {
     if (pinFilter === 'open' && p.status !== 'açık') return false;
     if (pinFilter === 'resolved' && p.status !== 'çözüldü') return false;
     if (pinFilter === 'mine' && p.assignee !== userData?.name) return false;
+    if (categoryFilter !== 'all' && p.category !== categoryFilter) return false;
 
     // Arama
     if (pinSearch) {
@@ -319,7 +353,7 @@ export default function ProjectDetail() {
     <div className="project-detail">
       <div className="detail-header">
         <div className="projects-top-left" style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '16px' }} onClick={() => navigate('/')}>
-          <img src="/logo.png" alt="KrokiNet Logo" style={{ width: '48px', height: '48px', borderRadius: '12px', objectFit: 'cover', border: '1px solid var(--border-color)' }} />
+          <img src="/logo.png" alt="Şanti Logo" style={{ width: '48px', height: '48px', borderRadius: '12px', objectFit: 'cover', border: '1px solid var(--border-color)' }} />
           <div>
             <h1>{project.name}</h1>
             <p>{userData?.name} ({userData?.role})</p>
@@ -406,9 +440,14 @@ export default function ProjectDetail() {
                   </button>
                 )}
                 {isManager && project.floorPlans && project.floorPlans.length > 0 && (
-                  <button className="btn-primary" onClick={() => setAddingPin(!addingPin)}>
-                    {addingPin ? '✕ İptal' : '📍 Yeni Pin (Sorun/İş)'}
-                  </button>
+                  <>
+                    <button className="btn-primary desktop-new-pin-btn" onClick={() => setAddingPin(!addingPin)}>
+                      {addingPin ? '✕ İptal' : '📍 Yeni Pin (Sorun/İş)'}
+                    </button>
+                    <button className="fab-button" onClick={() => setAddingPin(!addingPin)}>
+                      {addingPin ? '✕' : '+'}
+                    </button>
+                  </>
                 )}
               </div>
             {addingPin && (
@@ -420,7 +459,11 @@ export default function ProjectDetail() {
                     <input placeholder="Pin başlığı *" value={newPinData.title}
                       onChange={e => setNewPinData({...newPinData, title: e.target.value})} />
                     <select value={newPinData.category}
-                      onChange={e => setNewPinData({...newPinData, category: e.target.value})}>
+                      onChange={e => {
+                        const newCat = e.target.value;
+                        setNewPinData({...newPinData, category: newCat, color: CATEGORY_COLORS[newCat]});
+                      }}>
+                      <option value="" disabled>İş Türü Seçin</option>
                       {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
                     </select>
                     <button className="btn-primary" onClick={savePin}>Kaydet</button>
@@ -446,14 +489,22 @@ export default function ProjectDetail() {
                   placeholder="🔍 Pin Ara (Başlık veya Sorumlu)" 
                   value={pinSearch} 
                   onChange={e => setPinSearch(e.target.value)}
-                  style={{ flex: 1, padding: '8px 12px', borderRadius: 6, border: '1px solid #cbd5e1', background: 'var(--bg-main)', color: '#fff' }}
+                  style={{ flex: 1, padding: '8px 12px', borderRadius: 6, border: '1px solid var(--border-color)', background: 'var(--bg-main)', color: 'var(--text-main)' }}
                 />
+                <select 
+                  value={categoryFilter} 
+                  onChange={e => setCategoryFilter(e.target.value)}
+                  style={{ padding: '8px 12px', borderRadius: 6, border: '1px solid var(--border-color)', width: 160, background: 'var(--bg-main)', color: 'var(--text-main)', textTransform: 'capitalize' }}
+                >
+                  <option value="all">Tüm İşler</option>
+                  {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
                 <select 
                   value={pinFilter} 
                   onChange={e => setPinFilter(e.target.value)}
-                  style={{ padding: '8px 12px', borderRadius: 6, border: '1px solid #cbd5e1', width: 200, background: 'var(--bg-main)', color: '#fff' }}
+                  style={{ padding: '8px 12px', borderRadius: 6, border: '1px solid var(--border-color)', width: 200, background: 'var(--bg-main)', color: 'var(--text-main)' }}
                 >
-                  <option value="all">Tümü</option>
+                  <option value="all">Tüm Durumlar</option>
                   <option value="open">🔴 Sadece Açıklar</option>
                   <option value="resolved">🟢 Çözülenler</option>
                   <option value="mine">👤 Bana Atananlar</option>
@@ -470,6 +521,18 @@ export default function ProjectDetail() {
               >
                 {({ zoomIn, zoomOut, resetTransform }) => (
                   <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+                    
+                    {/* Lejant (Kategori Renkleri) */}
+                    <div style={{ position: 'absolute', top: 16, left: 16, zIndex: 100, background: 'var(--bg-main)', padding: '12px', borderRadius: '12px', border: '1px solid var(--border-color)', boxShadow: '0 4px 6px rgba(0,0,0,0.1)', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      <span style={{ fontSize: 12, fontWeight: 'bold', color: 'var(--text-muted)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: 0.5 }}>İş Türleri</span>
+                      {Object.entries(CATEGORY_COLORS).map(([cat, col]) => (
+                        <div key={cat} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <div style={{ width: 14, height: 14, borderRadius: '50%', background: col }} />
+                          <span style={{ fontSize: 13, color: 'var(--text-main)', textTransform: 'capitalize' }}>{cat}</span>
+                        </div>
+                      ))}
+                    </div>
+
                     <div className="zoom-controls">
                       <button className="zoom-btn" onClick={() => zoomIn()}>+</button>
                       <button className="zoom-btn" onClick={() => zoomOut()}>-</button>
@@ -498,7 +561,7 @@ export default function ProjectDetail() {
                               style={{ 
                                 left: `${currentX}%`, 
                                 top: `${currentY}%`, 
-                                background: pin.isArchived ? '#9ca3af' : (PIN_COLORS[pin.status] || '#F59E0B'),
+                                background: pin.isArchived ? '#9ca3af' : (pin.color || CATEGORY_COLORS[pin.category] || PIN_COLORS[pin.status] || '#F59E0B'),
                                 opacity: pin.isArchived ? 0.7 : 1,
                                 filter: pin.isArchived ? 'grayscale(100%)' : 'none',
                                 cursor: movingPinId === pin.id ? (isDragging ? 'grabbing' : 'grab') : 'pointer',
@@ -534,7 +597,7 @@ export default function ProjectDetail() {
                           );
                         })}
                         {newPinCoords && (
-                          <div className="pin-marker-custom" style={{ left: `${newPinCoords.x}%`, top: `${newPinCoords.y}%`, background: '#F59E0B' }}>
+                          <div className="pin-marker-custom" style={{ left: `${newPinCoords.x}%`, top: `${newPinCoords.y}%`, background: newPinData.color }}>
                             <div className="pin-tooltip">Yeni Pin</div>
                           </div>
                         )}
@@ -576,7 +639,7 @@ export default function ProjectDetail() {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
                 <div>
                   <label>Durum</label>
-                  <select value={projectInfo.status || 'devam ediyor'} onChange={e => setProjectInfo({...projectInfo, status: e.target.value})} style={{ width: '100%', padding: '12px 16px', background: 'rgba(0,0,0,0.25)', border: '1.5px solid var(--border-color)', borderRadius: 8, color: 'white' }}>
+                  <select value={projectInfo.status || 'devam ediyor'} onChange={e => setProjectInfo({...projectInfo, status: e.target.value})} style={{ width: '100%', padding: '12px 16px', background: 'var(--bg-main)', border: '1.5px solid var(--border-color)', borderRadius: 8, color: 'var(--text-main)' }}>
                     <option value="planlama">🏗️ Planlama</option>
                     <option value="devam ediyor">🚧 Devam Ediyor</option>
                     <option value="duraklatıldı">⏸️ Duraklatıldı</option>
@@ -589,7 +652,41 @@ export default function ProjectDetail() {
                 </div>
               </div>
               <label>Genel Notlar</label>
-              <textarea value={projectInfo.notes || ''} onChange={e => setProjectInfo({...projectInfo, notes: e.target.value})} rows={4} />
+              <textarea value={projectInfo.notes || ''} onChange={e => setProjectInfo({...projectInfo, notes: e.target.value})} rows={4} style={{ background: 'var(--bg-main)', color: 'var(--text-main)' }} />
+              
+              <div className="dashboard-card" style={{ marginTop: 20, marginBottom: 20 }}>
+                <div className="dashboard-card-title">📁 PROJE DOSYALARI (DWG, Render, PDF vs.)</div>
+                {isManager && (
+                  <label className="btn-secondary" style={{ cursor: 'pointer', display: 'inline-block', marginBottom: 16 }}>
+                    {uploadingProjectFile ? 'Yükleniyor...' : '➕ Yeni Dosya Yükle'}
+                    <input type="file" hidden onChange={uploadProjectFile} />
+                  </label>
+                )}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {(project.projectFiles || []).length === 0 ? (
+                    <p style={{ fontSize: 13, color: 'var(--text-muted)' }}>Henüz dosya yüklenmemiş.</p>
+                  ) : (
+                    project.projectFiles.map((f, i) => (
+                      <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-main)', padding: '10px 14px', borderRadius: 8, border: '1px solid var(--border-color)' }}>
+                        <span style={{ fontSize: 14, color: 'var(--text-main)', wordBreak: 'break-all' }}>{f.name}</span>
+                        <div style={{ display: 'flex', gap: 8 }}>
+                          <a href={f.url} target="_blank" rel="noreferrer" className="btn-primary" style={{ padding: '6px 12px', textDecoration: 'none', fontSize: 12 }}>İndir</a>
+                          {isManager && (
+                            <button className="btn-danger" style={{ padding: '6px 12px', fontSize: 12 }} onClick={async () => {
+                              if (window.confirm('Dosyayı silmek istediğinize emin misiniz?')) {
+                                const updatedFiles = project.projectFiles.filter((_, idx) => idx !== i);
+                                await updateDoc(doc(db, 'projects', projectId), { projectFiles: updatedFiles });
+                                fetchProject();
+                              }
+                            }}>Sil</button>
+                          )}
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+
               <div className="modal-actions">
                 <button className="btn-primary" onClick={saveProjectInfo}>Kaydet</button>
                 <button className="btn-secondary" onClick={() => setEditingInfo(false)}>İptal</button>
@@ -624,6 +721,39 @@ export default function ProjectDetail() {
                 <div className="dashboard-card">
                   <div className="dashboard-card-title">📝 NOTLAR</div>
                   <p style={{ fontSize: 14, color: 'var(--text-main)', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>{project.notes || 'Henüz not eklenmemiş.'}</p>
+                </div>
+
+                <div className="dashboard-card">
+                  <div className="dashboard-card-title">📁 PROJE DOSYALARI (DWG, Render, PDF vs.)</div>
+                  {isManager && (
+                    <label className="btn-secondary" style={{ cursor: 'pointer', display: 'inline-block', marginBottom: 16 }}>
+                      {uploadingProjectFile ? 'Yükleniyor...' : '➕ Yeni Dosya Yükle'}
+                      <input type="file" hidden onChange={uploadProjectFile} />
+                    </label>
+                  )}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {(project.projectFiles || []).length === 0 ? (
+                      <p style={{ fontSize: 13, color: 'var(--text-muted)' }}>Henüz dosya yüklenmemiş.</p>
+                    ) : (
+                      project.projectFiles.map((f, i) => (
+                        <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-main)', padding: '10px 14px', borderRadius: 8, border: '1px solid var(--border-color)' }}>
+                          <span style={{ fontSize: 14, color: 'var(--text-main)', wordBreak: 'break-all' }}>{f.name}</span>
+                          <div style={{ display: 'flex', gap: 8 }}>
+                            <a href={f.url} target="_blank" rel="noreferrer" className="btn-primary" style={{ padding: '6px 12px', textDecoration: 'none', fontSize: 12 }}>İndir</a>
+                            {isManager && (
+                              <button className="btn-danger" style={{ padding: '6px 12px', fontSize: 12 }} onClick={async () => {
+                                if (window.confirm('Dosyayı silmek istediğinize emin misiniz?')) {
+                                  const updatedFiles = project.projectFiles.filter((_, idx) => idx !== i);
+                                  await updateDoc(doc(db, 'projects', projectId), { projectFiles: updatedFiles });
+                                  fetchProject();
+                                }
+                              }}>Sil</button>
+                            )}
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
                 </div>
               </div>
 

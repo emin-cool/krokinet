@@ -9,6 +9,17 @@ import { MapPin, MessageSquare, Images, Info, Trash2, Edit2, Paperclip, CornerUp
 const CLOUDINARY_CLOUD = 'dcx4qribb';
 const CLOUDINARY_PRESET = 'insaat-upload';
 
+const CATEGORY_COLORS = {
+  'yapısal': '#ef4444', 
+  'elektrik': '#eab308', 
+  'tesisat': '#22c55e', 
+  'mekanik': '#f97316', 
+  'mimari': '#a855f7', 
+  'genel': '#3b82f6', 
+  'diğer': '#64748b'
+};
+const CATEGORIES = Object.keys(CATEGORY_COLORS);
+
 export default function PinDetailModal({ pin, projectId, isManager, onClose }) {
   const [activeTab, setActiveTab] = useState('chat');
   const [messages, setMessages] = useState([]);
@@ -21,6 +32,10 @@ export default function PinDetailModal({ pin, projectId, isManager, onClose }) {
   const [status, setStatus] = useState(pin.status);
   const [priority, setPriority] = useState(pin.priority || 'Normal');
   const [assignee, setAssignee] = useState(pin.assignee || '');
+  const [pinCategory, setPinCategory] = useState(pin.category || 'genel');
+  const [pinColor, setPinColor] = useState(pin.color || '#ef4444');
+  const [pinTitle, setPinTitle] = useState(pin.title);
+  const [editingHeader, setEditingHeader] = useState(false);
   const [pinInfo, setPinInfo] = useState(pin.info || '');
   const [editingInfo, setEditingInfo] = useState(false);
   const [savingInfo, setSavingInfo] = useState(false);
@@ -198,6 +213,20 @@ export default function PinDetailModal({ pin, projectId, isManager, onClose }) {
     setEditingInfo(false);
   }
 
+  async function saveHeaderInfo() {
+    const newColor = CATEGORY_COLORS[pinCategory] || '#3b82f6';
+    await updateDoc(doc(db, 'pins', pin.id), {
+      title: pinTitle,
+      category: pinCategory,
+      color: newColor
+    });
+    setEditingHeader(false);
+    pin.title = pinTitle;
+    pin.category = pinCategory;
+    pin.color = newColor;
+    setPinColor(newColor);
+  }
+
   async function deletePin() {
     if (!window.confirm('Pin silinecek, sohbet arşive taşınacak. Devam?')) return;
     await updateDoc(doc(db, 'pins', pin.id), { isArchived: true });
@@ -262,14 +291,40 @@ export default function PinDetailModal({ pin, projectId, isManager, onClose }) {
         />
       )}
       <div className="pin-modal" onClick={e => e.stopPropagation()}>
-        <div className="pin-modal-header">
-          <div>
-            <h2 style={{ display: 'flex', alignItems: 'center' }}>
-              <MapPin size={24} color="var(--primary-color)" style={{ marginRight: '8px' }} /> {pin.title}
-            </h2>
-            <span className="pin-category">{pin.category} {pin.isArchived ? '(Arşivlenmiş)' : ''}</span>
-          </div>
-          <div className="pin-header-actions">
+        <div className="bottom-sheet-handle"></div>
+        <div className="pin-modal-header" style={{ alignItems: editingHeader ? 'flex-start' : 'center' }}>
+          {editingHeader ? (
+            <div style={{ flex: 1, marginRight: 16 }}>
+              <input 
+                value={pinTitle} 
+                onChange={e => setPinTitle(e.target.value)} 
+                style={{ width: '100%', padding: '6px 10px', borderRadius: 6, border: '1px solid #ccc', marginBottom: 8, fontSize: 16, fontWeight: 'bold' }} 
+              />
+              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                <select value={pinCategory} onChange={e => {
+                  setPinCategory(e.target.value);
+                  setPinColor(CATEGORY_COLORS[e.target.value] || '#3b82f6');
+                }} style={{ padding: '6px 10px', border: '1px solid #e2e8f0', borderRadius: 6, fontSize: 13 }}>
+                  <option value="" disabled>İş Türü</option>
+                  {CATEGORIES.map(c => <option key={c} value={c} style={{ color: CATEGORY_COLORS[c], fontWeight: 'bold' }}>{c}</option>)}
+                </select>
+              </div>
+              <div style={{ marginTop: 8 }}>
+                <button className="btn-primary" onClick={saveHeaderInfo} style={{ padding: '4px 12px', fontSize: 13, marginRight: 8 }}>Kaydet</button>
+                <button className="btn-secondary" onClick={() => { setEditingHeader(false); setPinTitle(pin.title); setPinCategory(pin.category || 'genel'); setPinColor(pin.color || '#3b82f6'); }} style={{ padding: '4px 12px', fontSize: 13 }}>İptal</button>
+              </div>
+            </div>
+          ) : (
+            <div style={{ flex: 1 }}>
+              <h2 style={{ display: 'flex', alignItems: 'center', margin: '0 0 6px 0', fontSize: '1.25rem' }}>
+                <MapPin size={24} color={pinColor || "var(--primary-color)"} style={{ marginRight: '8px', minWidth: 24 }} /> 
+                <span style={{ wordBreak: 'break-word' }}>{pinTitle}</span>
+                {isManager && <Edit2 size={16} color="var(--text-muted)" style={{ cursor: 'pointer', marginLeft: 8, minWidth: 16 }} onClick={() => setEditingHeader(true)} />}
+              </h2>
+              <span className="pin-category" style={{ background: pinColor || '#ef4444' }}>{pinCategory} {pin.isArchived ? '(Arşivlenmiş)' : ''}</span>
+            </div>
+          )}
+          <div className="pin-header-actions" style={{ alignSelf: 'flex-start', marginTop: editingHeader ? 4 : 0 }}>
             {isManager && pin.isArchived && (
               <button className="btn-secondary" onClick={unarchivePin} style={{ marginRight: 8, fontSize: 13 }}>
                 📦 Arşivden Çıkar

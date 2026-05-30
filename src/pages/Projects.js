@@ -58,9 +58,9 @@ export default function Projects() {
       {/* Header */}
       <div className="projects-top-header">
         <div className="projects-top-left" style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-          <img src="/logo.png" alt="KrokiNet Logo" style={{ width: '48px', height: '48px', borderRadius: '12px', objectFit: 'cover', border: '1px solid var(--border-color)' }} />
+          <img src="/logo.png" alt="Şanti Logo" style={{ width: '48px', height: '48px', borderRadius: '12px', objectFit: 'cover', border: '1px solid var(--border-color)' }} />
           <div>
-            <h1>KrokiNet</h1>
+            <h1>Şanti</h1>
             <p>{userData?.name} ({userData?.role})</p>
           </div>
         </div>

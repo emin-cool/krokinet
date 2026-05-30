@@ -5,6 +5,8 @@ import Login from './pages/Login';
 import Projects from './pages/Projects';
 import ProjectDetail from './pages/ProjectDetail';
 import Profile from './pages/Profile';
+import NotificationsPage from './pages/NotificationsPage';
+import BottomNav from './components/BottomNav';
 import './index.css';
 
 function PrivateRoute({ children }) {
@@ -17,23 +19,80 @@ function PublicRoute({ children }) {
   return !currentUser ? children : <Navigate to="/" />;
 }
 
+function ThemeToggle() {
+  const [theme, setTheme] = React.useState(localStorage.getItem('theme') || 'light');
+  
+  React.useEffect(() => {
+    if (theme === 'dark') {
+      document.documentElement.setAttribute('data-theme', 'dark');
+    } else {
+      document.documentElement.removeAttribute('data-theme');
+    }
+    localStorage.setItem('theme', theme);
+  }, [theme]);
+
+  return (
+    <button
+      onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
+      style={{
+        position: 'fixed',
+        bottom: 20,
+        right: 20,
+        background: 'var(--primary-color)',
+        color: '#fff',
+        border: 'none',
+        borderRadius: '50%',
+        width: 50,
+        height: 50,
+        fontSize: 24,
+        cursor: 'pointer',
+        boxShadow: '0 4px 10px rgba(0,0,0,0.3)',
+        zIndex: 9999,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center'
+      }}
+      title="Temayı Değiştir"
+    >
+      {theme === 'light' ? '🌙' : '☀️'}
+    </button>
+  );
+}
+
 function AppRoutes() {
   return (
-    <Routes>
-      <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
-      <Route path="/" element={<PrivateRoute><Projects /></PrivateRoute>} />
-      <Route path="/profile" element={<PrivateRoute><Profile /></PrivateRoute>} />
-      <Route path="/project/:projectId" element={<PrivateRoute><ProjectDetail /></PrivateRoute>} />
-    </Routes>
+    <>
+      <Routes>
+        <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
+        <Route path="/" element={<PrivateRoute><Projects /></PrivateRoute>} />
+        <Route path="/profile" element={<PrivateRoute><Profile /></PrivateRoute>} />
+        <Route path="/project/:projectId" element={<PrivateRoute><ProjectDetail /></PrivateRoute>} />
+        <Route path="/notifications" element={<PrivateRoute><NotificationsPage /></PrivateRoute>} />
+      </Routes>
+      <ThemeToggle />
+      <BottomNav />
+    </>
   );
+}
+
+class ErrorBoundary extends React.Component {
+  constructor(props) { super(props); this.state = { hasError: false, error: null }; }
+  static getDerivedStateFromError(error) { return { hasError: true, error }; }
+  componentDidCatch(error, errorInfo) { console.error(error, errorInfo); }
+  render() {
+    if (this.state.hasError) return <div style={{padding: 20, color: 'red'}}><h1>Something went wrong.</h1><pre>{this.state.error.toString()}</pre></div>;
+    return this.props.children;
+  }
 }
 
 export default function App() {
   return (
-    <Router>
-      <AuthProvider>
-        <AppRoutes />
-      </AuthProvider>
-    </Router>
+    <ErrorBoundary>
+      <Router>
+        <AuthProvider>
+          <AppRoutes />
+        </AuthProvider>
+      </Router>
+    </ErrorBoundary>
   );
 }

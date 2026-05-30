@@ -65,9 +65,9 @@ export default function Profile() {
     <div className="projects-page" style={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
       <div className="projects-top-header">
         <div className="projects-top-left" style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '16px' }} onClick={() => navigate('/')}>
-          <img src="/logo.png" alt="KrokiNet Logo" style={{ width: '48px', height: '48px', borderRadius: '12px', objectFit: 'cover', border: '1px solid var(--border-color)' }} />
+          <img src="/logo.png" alt="Şanti Logo" style={{ width: '48px', height: '48px', borderRadius: '12px', objectFit: 'cover', border: '1px solid var(--border-color)' }} />
           <div>
-            <h1>KrokiNet</h1>
+            <h1>Şanti</h1>
             <p>Ana Sayfaya Dön</p>
           </div>
         </div>
