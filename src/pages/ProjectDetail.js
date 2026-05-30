@@ -4,7 +4,7 @@ import { db } from '../firebase';
 import { doc, getDoc, collection, query, where, addDoc, serverTimestamp, onSnapshot, updateDoc, getDocs, writeBatch, deleteDoc } from 'firebase/firestore';
 import { useAuth } from '../contexts/AuthContext';
 import PinDetailModal from '../components/PinDetailModal';
-import GeneralChat from '../components/GeneralChat';
+
 import ProjectGallery from '../components/ProjectGallery';
 import ProjectTeam from '../components/ProjectTeam';
 import NotificationsDropdown from '../components/NotificationsDropdown';
@@ -370,10 +370,6 @@ export default function ProjectDetail() {
         <button className={activeTab === 'plan' ? 'tab active' : 'tab'} onClick={() => setActiveTab('plan')}>
           <Ruler size={16} style={{ marginRight: '6px' }} /> Kat Planı
         </button>
-        <button className={activeTab === 'chat' ? 'projects-tab active' : 'projects-tab'}
-          onClick={() => setActiveTab('chat')}>
-          <MessageSquare size={16} style={{ marginRight: '6px' }} /> Genel Sohbet
-        </button>
         <button className={activeTab === 'info' ? 'projects-tab active' : 'projects-tab'}
           onClick={() => setActiveTab('info')}>
           <Info size={16} style={{ marginRight: '6px' }} /> Proje Bilgileri
@@ -610,8 +606,6 @@ export default function ProjectDetail() {
           )}
         </div>
       )}
-
-      {activeTab === 'chat' && <GeneralChat projectId={projectId} />}
 
       {activeTab === 'info' && (
         <div className="info-view">
