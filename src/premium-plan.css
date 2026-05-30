@@ -149,12 +149,6 @@
   box-shadow: inset 0 2px 4px rgba(0,0,0,0.3);
 }
 
-.pin-marker-custom:hover {
-  transform: translate(-50%, -100%) rotate(-45deg) scale(1.15);
-  z-index: 110;
-  box-shadow: -4px 4px 12px rgba(0,0,0,0.6);
-}
-
 /* Tooltip for Pin */
 .pin-tooltip {
   position: absolute;
@@ -176,10 +170,27 @@
   box-shadow: var(--shadow-lg);
 }
 
-.pin-marker-custom:hover .pin-tooltip {
-  opacity: 1;
-  visibility: visible;
-  top: -45px;
+@media (hover: hover) {
+  .pin-marker:hover {
+    transform: translate(-50%, -100%) scale(1.2);
+    z-index: 110;
+  }
+  .pin-marker-custom:hover {
+    transform: translate(-50%, -100%) rotate(-45deg) scale(1.15);
+    z-index: 110;
+    box-shadow: -4px 4px 12px rgba(0,0,0,0.6);
+  }
+  .pin-marker-custom:hover .pin-tooltip {
+    opacity: 1;
+    visibility: visible;
+    top: -45px;
+  }
+}
+
+@media (hover: none) {
+  .pin-tooltip {
+    display: none !important;
+  }
 }
 
 /* 5. Transform Wrapper Styling */

@@ -2090,14 +2090,28 @@ body {
   }
   
   /* Transform Modal to Bottom Sheet */
-  .modal-content, .pin-modal, .team-modal {
+  .modal-content {
     border-radius: 20px 20px 0 0 !important;
     position: absolute !important;
     bottom: 0 !important;
     margin: 0 !important;
     width: 100% !important;
     animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) !important;
-    padding: 24px 20px !important;
+    padding: 24px 20px 30px 20px !important;
+  }
+
+  .pin-modal, .team-modal {
+    border-radius: 20px 20px 0 0 !important;
+    position: absolute !important;
+    bottom: 0 !important;
+    margin: 0 !important;
+    width: 100% !important;
+    animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) !important;
+    padding: 24px 20px 50px 20px !important; /* More padding at bottom so inputs are easier to reach */
+    height: 90vh !important; /* Force tall bottom sheet so it doesn't shrink */
+    max-height: 90vh !important;
+    display: flex;
+    flex-direction: column;
   }
   
   .bottom-sheet-handle {
