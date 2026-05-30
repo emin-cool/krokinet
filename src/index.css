@@ -2115,3 +2115,19 @@ body {
     min-height: 44px;
   }
 }
+
+/* Hide Bottom Nav and FAB when keyboard is open (viewport height shrinks) */
+@media (max-height: 600px) and (max-width: 768px) {
+  .bottom-nav {
+    display: none !important;
+  }
+  .fab-button {
+    display: none !important;
+  }
+  body {
+    padding-bottom: 0 !important;
+  }
+  .modal-content, .pin-modal, .team-modal {
+    max-height: 95vh !important;
+  }
+}
