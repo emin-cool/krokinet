@@ -4,7 +4,7 @@ import { collection, query, where, orderBy, onSnapshot, addDoc, serverTimestamp,
 import { useAuth } from '../contexts/AuthContext';
 import ProjectGallery from './ProjectGallery';
 import ImageMarkupModal from './ImageMarkupModal';
-import { MapPin, MessageSquare, Images, Info, Trash2, Edit2, Paperclip, CornerUpLeft, ClipboardList, FolderOpen, FileText, Image as ImageIcon, UserCheck } from 'lucide-react';
+import { MapPin, MessageSquare, Images, Info, Trash2, Edit2, Paperclip, CornerUpLeft, ClipboardList, FolderOpen, FileText, Image as ImageIcon, UserCheck, Search } from 'lucide-react';
 
 const CLOUDINARY_CLOUD = 'dcx4qribb';
 const CLOUDINARY_PRESET = 'insaat-upload';
@@ -42,6 +42,8 @@ export default function PinDetailModal({ pin, projectId, isManager, onClose }) {
   const [users, setUsers] = useState([]);
   const [showMention, setShowMention] = useState(false);
   const [mentionSearch, setMentionSearch] = useState('');
+  const [chatSearch, setChatSearch] = useState('');
+  const [showSearch, setShowSearch] = useState(false);
   
   const [markupImageUrl, setMarkupImageUrl] = useState(null);
   const [markupTarget, setMarkupTarget] = useState(null);
@@ -227,9 +229,31 @@ export default function PinDetailModal({ pin, projectId, isManager, onClose }) {
   }
 
   async function deletePin() {
-    if (!window.confirm('Pin silinecek, sohbet arşive taşınacak. Devam?')) return;
-    await updateDoc(doc(db, 'pins', pin.id), { isArchived: true });
-    onClose();
+    const action = window.prompt('Pini kaldırmak için "arsiv" veya "sil" yazın:\\n\\narsiv: Pin gizlenir, arşive kaldırılır.\\nsil: Pin ve içindeki her şey KÖKTEN silinir.');
+    
+    if (action === 'arsiv' || action === 'arşiv') {
+      await updateDoc(doc(db, 'pins', pin.id), { isArchived: true });
+      onClose();
+    } else if (action === 'sil') {
+      if (!window.confirm('DİKKAT: Pin, mesajlar ve dosyalar tamamen SİLİNECEK! Emin misiniz?')) return;
+      
+      try {
+        // Delete messages
+        for (const msg of messages) {
+          await deleteDoc(doc(db, 'messages', msg.id));
+        }
+        // Delete files
+        for (const file of files) {
+          await deleteDoc(doc(db, 'files', file.id));
+        }
+        // Delete pin
+        await deleteDoc(doc(db, 'pins', pin.id));
+        onClose();
+      } catch (err) {
+        console.error("Silme hatası:", err);
+        alert("Silinirken bir hata oluştu.");
+      }
+    }
   }
 
   async function unarchivePin() {
@@ -354,9 +378,28 @@ export default function PinDetailModal({ pin, projectId, isManager, onClose }) {
 
         {activeTab === 'chat' && (
           <div className="chat-container">
+            <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '8px 16px', borderBottom: '1px solid var(--border-color)', background: 'rgba(255,255,255,0.02)' }}>
+              {showSearch ? (
+                <div style={{ display: 'flex', alignItems: 'center', width: '100%', gap: 8, background: 'var(--bg-card)', padding: '4px 12px', borderRadius: 20, border: '1px solid var(--primary-color)' }}>
+                  <Search size={14} color="var(--text-muted)" />
+                  <input 
+                    autoFocus
+                    placeholder="Mesajlarda ara..." 
+                    value={chatSearch} 
+                    onChange={e => setChatSearch(e.target.value)}
+                    style={{ flex: 1, background: 'transparent', border: 'none', color: 'var(--text-main)', fontSize: 14, outline: 'none' }}
+                  />
+                  <button onClick={() => { setShowSearch(false); setChatSearch(''); }} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>✕</button>
+                </div>
+              ) : (
+                <button onClick={() => setShowSearch(true)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <Search size={16} /> <span style={{ fontSize: 13 }}>Ara</span>
+                </button>
+              )}
+            </div>
             <div className="messages-list">
-              {messages.length === 0 && <div className="chat-empty">Henüz mesaj yok.</div>}
-              {messages.map(msg => (
+              {messages.filter(m => !chatSearch || m.text?.toLowerCase().includes(chatSearch.toLowerCase())).length === 0 && <div className="chat-empty">Henüz mesaj yok.</div>}
+              {messages.filter(m => !chatSearch || m.text?.toLowerCase().includes(chatSearch.toLowerCase())).map(msg => (
                 <div key={msg.id} className={`message ${msg.userId === currentUser.uid ? 'own' : ''}`}>
                   <div className="message-header">
                     <span className="message-name">{msg.userName}</span>

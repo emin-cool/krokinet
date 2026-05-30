@@ -9,7 +9,7 @@ import ProjectGallery from '../components/ProjectGallery';
 import ProjectTeam from '../components/ProjectTeam';
 import NotificationsDropdown from '../components/NotificationsDropdown';
 import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
-import { Building, Ruler, MessageSquare, Info, Users, MapPin } from 'lucide-react';
+import { Building, Ruler, MessageSquare, Info, Users, MapPin, Archive } from 'lucide-react';
 
 const PIN_COLORS = { 'açık': '#ef4444', 'devam ediyor': '#f59e0b', 'çözüldü': '#22c55e' };
 const CATEGORY_COLORS = {
@@ -342,10 +342,13 @@ export default function ProjectDetail() {
       if (!titleMatch && !assigneeMatch) return false;
     }
     
-    if (!showArchivedPins && p.isArchived) return false;
+    if (p.isArchived) return false;
 
     return true;
   });
+
+  const archivedPins = pins.filter(p => p.isArchived);
+  const archivedPlans = project?.floorPlans?.filter(fp => fp.isArchived) || [];
 
   const floorPlans = project.floorPlans || [];
 
@@ -377,21 +380,18 @@ export default function ProjectDetail() {
         <button className={activeTab === 'team' ? 'tab active' : 'tab'} onClick={() => setActiveTab('team')}>
           <Users size={16} style={{ marginRight: '6px' }} /> Ekip
         </button>
+        {isManager && (
+          <button className={activeTab === 'archive' ? 'tab active' : 'tab'} onClick={() => setActiveTab('archive')}>
+            <Archive size={16} style={{ marginRight: '6px' }} /> Arşiv
+          </button>
+        )}
       </div>
 
       {activeTab === 'plan' && (
         <div className="plan-view">
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-            <button 
-              onClick={() => setShowArchivedPlans(!showArchivedPlans)}
-              style={{ background: 'none', border: 'none', cursor: 'pointer', color: showArchivedPlans ? 'var(--primary-color)' : 'var(--text-muted)', fontSize: '13px', fontWeight: 500, padding: '4px 8px' }}
-            >
-              {showArchivedPlans ? 'Arşivlenen Planları Gizle' : 'Arşivlenen Planları Göster'}
-            </button>
-          </div>
-          <div className="floor-tabs">
+          <div className="floor-tabs" style={{ marginTop: 16 }}>
             {floorPlans.map((fp, i) => {
-              if (fp.isArchived && !showArchivedPlans) return null;
+              if (fp.isArchived) return null;
               return (
               <div key={i} className="floor-tab-wrapper">
                 <button className={activeFloor === i ? 'floor-tab active' : 'floor-tab'} onClick={() => setActiveFloor(i)} style={{ opacity: fp.isArchived ? 0.6 : 1, filter: fp.isArchived ? 'grayscale(100%)' : 'none' }}>
@@ -427,14 +427,6 @@ export default function ProjectDetail() {
 
           <div className="plan-toolbar">
               <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                {project.floorPlans && project.floorPlans.length > 0 && (
-                  <button 
-                    onClick={() => setShowArchivedPins(!showArchivedPins)}
-                    style={{ background: showArchivedPins ? 'var(--primary-color)' : 'white', color: showArchivedPins ? 'white' : 'var(--text-muted)', border: '1px solid #e2e8f0', padding: '6px 12px', borderRadius: 8, fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, transition: 'all 0.2s' }}
-                  >
-                    📦 {showArchivedPins ? 'Arşivi Gizle' : 'Arşivi Göster'}
-                  </button>
-                )}
                 {isManager && project.floorPlans && project.floorPlans.length > 0 && (
                   <>
                     <button className="btn-primary desktop-new-pin-btn" onClick={() => setAddingPin(!addingPin)}>
@@ -604,6 +596,50 @@ export default function ProjectDetail() {
               </TransformWrapper>
             </div>
           )}
+        </div>
+      )}
+
+      {activeTab === 'archive' && isManager && (
+        <div className="archive-view" style={{ padding: '24px', background: 'var(--bg-card)', minHeight: '60vh', borderRadius: '12px', marginTop: '16px' }}>
+          <h2 style={{ fontSize: 18, marginBottom: 20 }}>📦 Arşivlenen İçerikler</h2>
+          
+          <div style={{ marginBottom: 32 }}>
+            <h3 style={{ fontSize: 16, color: 'var(--text-muted)', marginBottom: 12, borderBottom: '1px solid var(--border-color)', paddingBottom: 8 }}>Arşivlenen Kat Planları</h3>
+            {archivedPlans.length === 0 ? (
+              <p style={{ fontSize: 14, color: 'var(--text-muted)' }}>Arşivlenmiş kat planı bulunmuyor.</p>
+            ) : (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 16 }}>
+                {project.floorPlans.map((fp, i) => {
+                  if (!fp.isArchived) return null;
+                  return (
+                    <div key={i} style={{ padding: 16, border: '1px solid var(--border-color)', borderRadius: 8, background: 'var(--bg-main)', position: 'relative' }}>
+                      <p style={{ fontWeight: 'bold', marginBottom: 8 }}>{fp.name}</p>
+                      <button className="btn-secondary" onClick={() => toggleArchiveFloorPlan(i, fp.isArchived)} style={{ width: '100%' }}>Arşivden Çıkar</button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          <div>
+            <h3 style={{ fontSize: 16, color: 'var(--text-muted)', marginBottom: 12, borderBottom: '1px solid var(--border-color)', paddingBottom: 8 }}>Arşivlenen Pinler</h3>
+            {archivedPins.length === 0 ? (
+              <p style={{ fontSize: 14, color: 'var(--text-muted)' }}>Arşivlenmiş pin bulunmuyor.</p>
+            ) : (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: 16 }}>
+                {archivedPins.map(pin => (
+                  <div key={pin.id} style={{ padding: 16, border: '1px solid var(--border-color)', borderRadius: 8, background: 'var(--bg-main)', cursor: 'pointer', transition: 'all 0.2s' }} onClick={() => setSelectedPin(pin)} className="archived-pin-card">
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                      <div style={{ width: 12, height: 12, borderRadius: '50%', background: pin.color || '#F59E0B' }} />
+                      <span style={{ fontWeight: 'bold' }}>{pin.title}</span>
+                    </div>
+                    <p style={{ fontSize: 12, color: 'var(--text-muted)' }}>{pin.category} • Kat: {project.floorPlans[pin.floorIndex]?.name}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       )}
 
