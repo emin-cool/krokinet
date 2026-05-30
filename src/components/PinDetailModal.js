@@ -4,7 +4,7 @@ import { collection, query, where, orderBy, onSnapshot, addDoc, serverTimestamp,
 import { useAuth } from '../contexts/AuthContext';
 import ProjectGallery from './ProjectGallery';
 import ImageMarkupModal from './ImageMarkupModal';
-import { MapPin, MessageSquare, Images, Info, Trash2, Edit2, Paperclip, CornerUpLeft, ClipboardList, FolderOpen, FileText, Image as ImageIcon, UserCheck, Search } from 'lucide-react';
+import { MapPin, MessageSquare, Images, Info, Trash2, Edit2, Paperclip, CornerUpLeft, ClipboardList, FolderOpen, FileText, Image as ImageIcon, UserCheck, Search, Pin, PinOff } from 'lucide-react';
 
 const CLOUDINARY_CLOUD = 'dcx4qribb';
 const CLOUDINARY_PRESET = 'insaat-upload';
@@ -275,6 +275,10 @@ export default function PinDetailModal({ pin, projectId, isManager, onClose }) {
     setEditingMessageId(null);
   }
 
+  async function togglePinMessage(msgId, currentIsPinned) {
+    await updateDoc(doc(db, 'messages', msgId), { isPinned: !currentIsPinned });
+  }
+
   const renderTextWithMentions = (text) => {
     if (!text) return null;
     const parts = text.split(/(@\S+)/g);
@@ -377,6 +381,30 @@ export default function PinDetailModal({ pin, projectId, isManager, onClose }) {
 
         {activeTab === 'chat' && (
           <div className="chat-container">
+            {messages.some(m => m.isPinned) && (
+              <div style={{ background: 'rgba(59, 130, 246, 0.1)', borderBottom: '1px solid var(--border-color)', padding: '12px 16px', maxHeight: '180px', overflowY: 'auto' }}>
+                <div style={{ fontSize: 12, fontWeight: 'bold', color: 'var(--primary-color)', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <Pin size={12} /> Sabitlenmiş Mesajlar
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {messages.filter(m => m.isPinned).map(msg => (
+                    <div key={'pinned-' + msg.id} style={{ background: 'var(--bg-card)', padding: '8px 12px', borderRadius: 8, fontSize: 13, borderLeft: '3px solid var(--primary-color)' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                        <span style={{ fontWeight: 'bold', color: 'var(--text-main)' }}>{msg.userName}</span>
+                        {isManager && (
+                          <button style={{ background: 'none', border: 'none', cursor: 'pointer', opacity: 0.7 }} onClick={() => togglePinMessage(msg.id, msg.isPinned)} title="Sabitlemeyi Kaldır">
+                            <PinOff size={12} color="var(--text-muted)" />
+                          </button>
+                        )}
+                      </div>
+                      <div style={{ color: 'var(--text-main)' }}>
+                        {msg.text ? renderTextWithMentions(msg.text) : <em style={{ color: 'var(--text-muted)' }}>Fotoğraf/Dosya</em>}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
             <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '8px 16px', borderBottom: '1px solid var(--border-color)', background: 'rgba(255,255,255,0.02)' }}>
               {showSearch ? (
                 <div style={{ display: 'flex', alignItems: 'center', width: '100%', gap: 8, background: 'var(--bg-card)', padding: '4px 12px', borderRadius: 20, border: '1px solid var(--primary-color)' }}>
@@ -407,6 +435,11 @@ export default function PinDetailModal({ pin, projectId, isManager, onClose }) {
                       <button style={{ background: 'none', border: 'none', cursor: 'pointer', opacity: 0.6 }} onClick={() => setReplyTo({ id: msg.id, userName: msg.userName, text: msg.text || 'Fotoğraf' })}>
                         <CornerUpLeft size={14} color="#94a3b8" />
                       </button>
+                      {isManager && (
+                        <button style={{ background: 'none', border: 'none', cursor: 'pointer', opacity: msg.isPinned ? 1 : 0.6 }} onClick={() => togglePinMessage(msg.id, msg.isPinned)} title={msg.isPinned ? "Sabitlemeyi Kaldır" : "Mesajı Sabitle"}>
+                          {msg.isPinned ? <PinOff size={14} color="#3b82f6" /> : <Pin size={14} color="#94a3b8" />}
+                        </button>
+                      )}
                       {msg.userId === currentUser.uid && (
                         <>
                           <button style={{ background: 'none', border: 'none', cursor: 'pointer', opacity: 0.6 }} onClick={() => { setEditingMessageId(msg.id); setEditingMessageText(msg.text); }}>
