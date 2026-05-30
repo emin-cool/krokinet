@@ -61,8 +61,7 @@ export default function PinDetailModal({ pin, projectId, isManager, onClose }) {
       if (!projectSnap.exists()) return;
       const projectData = projectSnap.data();
       const allRoles = projectData.memberRoles || {};
-      // null/silinmiş üyeleri filtrele
-      const memberIds = Object.keys(allRoles).filter(uid => allRoles[uid] !== null && allRoles[uid] !== undefined);
+      const memberIds = [...(projectData.memberIds || [])];
       // Manager'ı da ekle
       if (projectData.managerId && !memberIds.includes(projectData.managerId)) {
         memberIds.push(projectData.managerId);
@@ -433,7 +432,10 @@ export default function PinDetailModal({ pin, projectId, isManager, onClose }) {
                 {showMention && filteredUsers.length > 0 && (
                   <div style={{ position: 'absolute', bottom: '100%', left: 0, background: '#1e293b', border: '1px solid #334155', borderRadius: 8, padding: 8, zIndex: 10, maxHeight: 150, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 4, width: 200, marginBottom: 8, boxShadow: '0 10px 25px rgba(0,0,0,0.5)' }}>
                     {filteredUsers.map((u, i) => (
-                      <div key={i} onClick={() => handleMentionSelect(u.name)} style={{ padding: '6px 10px', cursor: 'pointer', borderRadius: 4, fontSize: 13, color: '#fff', background: 'rgba(255,255,255,0.05)' }}>
+                      <div key={i} 
+                           onMouseDown={(e) => { e.preventDefault(); handleMentionSelect(u.name); }} 
+                           onTouchStart={(e) => { e.preventDefault(); handleMentionSelect(u.name); }} 
+                           style={{ padding: '8px 12px', cursor: 'pointer', borderRadius: 4, fontSize: 14, color: '#fff', background: 'rgba(255,255,255,0.1)', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
                         {u.name}
                       </div>
                     ))}
