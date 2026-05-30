@@ -31,7 +31,7 @@ export default function PinDetailModal({ pin, projectId, isManager, onClose }) {
   const [uploading, setUploading] = useState(false);
   const [status, setStatus] = useState(pin.status);
   const [priority, setPriority] = useState(pin.priority || 'Normal');
-  const [assignee, setAssignee] = useState(pin.assignee || '');
+
   const [pinCategory, setPinCategory] = useState(pin.category || 'genel');
   const [pinColor, setPinColor] = useState(pin.color || '#ef4444');
   const [pinTitle, setPinTitle] = useState(pin.title);
@@ -207,8 +207,7 @@ export default function PinDetailModal({ pin, projectId, isManager, onClose }) {
     setSavingInfo(true);
     await updateDoc(doc(db, 'pins', pin.id), { 
       info: pinInfo,
-      priority,
-      assignee
+      priority
     });
     setSavingInfo(false);
     setEditingInfo(false);
@@ -509,7 +508,7 @@ export default function PinDetailModal({ pin, projectId, isManager, onClose }) {
               </div>
               {editingInfo ? (
                 <div>
-                  <input type="text" placeholder="Sorumlu Kişi / Ekip" value={assignee} onChange={e => setAssignee(e.target.value)} style={{ width: '100%', padding: '8px 10px', border: '1px solid #e2e8f0', borderRadius: 8, marginBottom: 10, fontSize: 14 }} />
+
                   <textarea value={pinInfo} onChange={e => setPinInfo(e.target.value)}
                     placeholder="Bu pin hakkında bilgiler, yapılacaklar (madde başı tire ile)..." rows={5}
                     style={{ width: '100%', padding: '10px', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: 14, fontFamily: 'inherit', resize: 'vertical' }} />
@@ -517,18 +516,12 @@ export default function PinDetailModal({ pin, projectId, isManager, onClose }) {
                     <button className="btn-primary" onClick={savePinInfo} disabled={savingInfo}>
                       {savingInfo ? 'Kaydediliyor...' : 'Kaydet'}
                     </button>
-                    <button className="btn-secondary" onClick={() => { setEditingInfo(false); setPinInfo(pin.info || ''); setAssignee(pin.assignee || ''); }}>İptal</button>
+                    <button className="btn-secondary" onClick={() => { setEditingInfo(false); setPinInfo(pin.info || ''); }}>İptal</button>
                   </div>
                 </div>
               ) : (
                 <div style={{ fontSize: 14, color: 'var(--text-main)', lineHeight: 1.7 }}>
-                  {assignee && (
-                    <div style={{ marginBottom: 16, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <UserCheck size={16} color="var(--primary-color)" />
-                      <span style={{ color: 'var(--text-muted)' }}>Sorumlu:</span>
-                      <span style={{ background: 'var(--bg-card-hover)', padding: '4px 10px', borderRadius: 12, fontWeight: 600 }}>{assignee}</span>
-                    </div>
-                  )}
+
                   <div style={{ whiteSpace: 'pre-wrap', color: pinInfo ? 'var(--text-main)' : 'var(--text-muted)' }}>
                     {pinInfo || (isManager ? 'Henüz bilgi eklenmemiş. Düzenle butonuna tıklayın.' : 'Henüz bilgi eklenmemiş.')}
                   </div>
