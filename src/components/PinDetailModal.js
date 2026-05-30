@@ -44,6 +44,7 @@ export default function PinDetailModal({ pin, projectId, isManager, onClose }) {
   const [mentionSearch, setMentionSearch] = useState('');
   const [chatSearch, setChatSearch] = useState('');
   const [showSearch, setShowSearch] = useState(false);
+  const [hasSeenPinned, setHasSeenPinned] = useState(false);
   
   const [markupImageUrl, setMarkupImageUrl] = useState(null);
   const [markupTarget, setMarkupTarget] = useState(null);
@@ -380,31 +381,53 @@ export default function PinDetailModal({ pin, projectId, isManager, onClose }) {
         )}
 
         {activeTab === 'chat' && (
-          <div className="chat-container">
-            {messages.some(m => m.isPinned) && (
-              <div style={{ background: 'rgba(59, 130, 246, 0.1)', borderBottom: '1px solid var(--border-color)', padding: '12px 16px', maxHeight: '180px', overflowY: 'auto' }}>
-                <div style={{ fontSize: 12, fontWeight: 'bold', color: 'var(--primary-color)', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <Pin size={12} /> Sabitlenmiş Mesajlar
+          <div className="chat-container" style={{ position: 'relative' }}>
+            {messages.some(m => m.isPinned) && !hasSeenPinned && (
+              <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, background: 'var(--bg-surface)', zIndex: 100, display: 'flex', flexDirection: 'column', padding: 20 }}>
+                <div style={{ flex: 1, overflowY: 'auto' }}>
+                  <div style={{ fontSize: 18, fontWeight: 'bold', color: 'var(--primary-color)', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'center' }}>
+                    <Pin size={20} /> Sabitlenmiş Mesajlar
+                  </div>
+                  <div style={{ color: 'var(--text-muted)', marginBottom: 20, textAlign: 'center', fontSize: 13 }}>
+                    Sohbete geçmeden önce yöneticiler tarafından sabitlenen bu önemli mesajları okumalısınız.
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                    {messages.filter(m => m.isPinned).map(msg => (
+                      <div key={'pinned-' + msg.id} style={{ background: 'var(--bg-card)', padding: '16px', borderRadius: 12, fontSize: 15, borderLeft: '4px solid var(--primary-color)', boxShadow: 'var(--shadow-sm)' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                          <span style={{ fontWeight: 'bold', color: 'var(--text-main)', fontSize: 14 }}>{msg.userName} <span style={{ color: 'var(--text-muted)', fontWeight: 'normal', fontSize: 12 }}>({msg.userRole})</span></span>
+                          {isManager && (
+                            <button style={{ background: 'none', border: 'none', cursor: 'pointer', opacity: 0.7 }} onClick={() => togglePinMessage(msg.id, msg.isPinned)} title="Sabitlemeyi Kaldır">
+                              <PinOff size={16} color="var(--text-muted)" />
+                            </button>
+                          )}
+                        </div>
+                        <div style={{ color: 'var(--text-main)', lineHeight: 1.5 }}>
+                          {msg.text ? renderTextWithMentions(msg.text) : <em style={{ color: 'var(--text-muted)' }}>Fotoğraf/Dosya</em>}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  {messages.filter(m => m.isPinned).map(msg => (
-                    <div key={'pinned-' + msg.id} style={{ background: 'var(--bg-card)', padding: '8px 12px', borderRadius: 8, fontSize: 13, borderLeft: '3px solid var(--primary-color)' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                        <span style={{ fontWeight: 'bold', color: 'var(--text-main)' }}>{msg.userName}</span>
-                        {isManager && (
-                          <button style={{ background: 'none', border: 'none', cursor: 'pointer', opacity: 0.7 }} onClick={() => togglePinMessage(msg.id, msg.isPinned)} title="Sabitlemeyi Kaldır">
-                            <PinOff size={12} color="var(--text-muted)" />
-                          </button>
-                        )}
-                      </div>
-                      <div style={{ color: 'var(--text-main)' }}>
-                        {msg.text ? renderTextWithMentions(msg.text) : <em style={{ color: 'var(--text-muted)' }}>Fotoğraf/Dosya</em>}
-                      </div>
-                    </div>
-                  ))}
+                <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px solid var(--border-color)', textAlign: 'center' }}>
+                  <button className="btn-primary" style={{ width: '100%', padding: '14px', fontSize: 16, borderRadius: 12, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 8 }} onClick={() => setHasSeenPinned(true)}>
+                    Sohbete Geç (Atla)
+                  </button>
                 </div>
               </div>
             )}
+            
+            {messages.some(m => m.isPinned) && hasSeenPinned && (
+              <div style={{ padding: '8px 16px', background: 'rgba(59, 130, 246, 0.05)', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: 13, color: 'var(--primary-color)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <Pin size={14} /> {messages.filter(m => m.isPinned).length} Sabitlenmiş Mesaj
+                </span>
+                <button onClick={() => setHasSeenPinned(false)} style={{ background: 'none', border: 'none', color: 'var(--primary-color)', fontSize: 12, fontWeight: 'bold', cursor: 'pointer' }}>
+                  Göster
+                </button>
+              </div>
+            )}
+
             <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '8px 16px', borderBottom: '1px solid var(--border-color)', background: 'rgba(255,255,255,0.02)' }}>
               {showSearch ? (
                 <div style={{ display: 'flex', alignItems: 'center', width: '100%', gap: 8, background: 'var(--bg-card)', padding: '4px 12px', borderRadius: 20, border: '1px solid var(--primary-color)' }}>
