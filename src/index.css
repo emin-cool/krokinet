@@ -2131,3 +2131,21 @@ body {
     max-height: 95vh !important;
   }
 }
+
+/* Explicit class added by React when keyboard opens on iOS/Android */
+body.keyboard-open .bottom-nav {
+  display: none !important;
+}
+body.keyboard-open .fab-button {
+  display: none !important;
+}
+body.keyboard-open {
+  padding-bottom: 0 !important;
+}
+body.keyboard-open .modal-content, 
+body.keyboard-open .pin-modal, 
+body.keyboard-open .team-modal {
+  max-height: 95vh !important;
+  /* Additional safety margin so inputs aren't blocked by Safari bottom toolbar */
+  padding-bottom: 120px !important;
+}

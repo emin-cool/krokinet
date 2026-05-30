@@ -60,6 +60,42 @@ function ThemeToggle() {
 }
 
 function AppRoutes() {
+  React.useEffect(() => {
+    if (!window.visualViewport) {
+      // Fallback for browsers without visualViewport API
+      const handleFocusIn = (e) => {
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
+          document.body.classList.add('keyboard-open');
+        }
+      };
+      const handleFocusOut = (e) => {
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
+          document.body.classList.remove('keyboard-open');
+        }
+      };
+      document.addEventListener('focusin', handleFocusIn);
+      document.addEventListener('focusout', handleFocusOut);
+      return () => {
+        document.removeEventListener('focusin', handleFocusIn);
+        document.removeEventListener('focusout', handleFocusOut);
+      };
+    }
+
+    const handleResize = () => {
+      // If visual viewport is significantly smaller than screen height, keyboard is open
+      if (window.visualViewport.height < window.screen.availHeight * 0.8) {
+        document.body.classList.add('keyboard-open');
+      } else {
+        document.body.classList.remove('keyboard-open');
+      }
+    };
+    
+    window.visualViewport.addEventListener('resize', handleResize);
+    handleResize(); // Check initially
+    
+    return () => window.visualViewport.removeEventListener('resize', handleResize);
+  }, []);
+
   return (
     <>
       <Routes>
