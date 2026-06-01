@@ -61,7 +61,7 @@ export default function BudgetCalculator() {
   }
 
   return (
-    <div className="budget-view" style={{ padding: '20px', backgroundColor: 'var(--bg-main)', minHeight: '80vh', color: 'white' }}>
+    <div className="budget-view" style={{ padding: '20px', backgroundColor: 'var(--bg-main)', minHeight: '80vh', color: 'var(--text-main)' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px', alignItems: 'center' }}>
         <div>
           <h2 style={{ marginBottom: '10px' }}>💰 Canlı Keşif ve Bütçe Hesaplayıcı</h2>
@@ -70,7 +70,7 @@ export default function BudgetCalculator() {
             value={reportName} 
             onChange={(e) => setReportName(e.target.value)} 
             className="price-input"
-            style={{ width: '300px', padding: '10px', backgroundColor: 'var(--bg-secondary)', color: 'white', borderRadius: '4px', border: '1px solid var(--border-color)' }}
+            style={{ width: '300px', padding: '10px', backgroundColor: 'var(--bg-secondary)', color: 'var(--text-main)', borderRadius: '4px', border: '1px solid var(--border-color)' }}
             placeholder="Rapor Adı (Örn: XYZ Projesi Keşfi)"
           />
         </div>
@@ -88,7 +88,7 @@ export default function BudgetCalculator() {
                 className="price-input" 
                 value={newBudgetItem.materialId} 
                 onChange={e => setNewBudgetItem({...newBudgetItem, materialId: e.target.value})}
-                style={{ width: '100%', padding: '10px', backgroundColor: 'var(--bg-main)', color: 'white', borderRadius: '4px', border: '1px solid var(--border-color)' }}>
+                style={{ width: '100%', padding: '10px', backgroundColor: 'var(--bg-main)', color: 'var(--text-main)', borderRadius: '4px', border: '1px solid var(--border-color)' }}>
                 {MATERIALS.map(m => <option key={m.id} value={m.id}>{m.emoji} {m.name} ({m.unit})</option>)}
               </select>
             </div>
@@ -100,7 +100,7 @@ export default function BudgetCalculator() {
                 className="price-input" 
                 value={newBudgetItem.quantity} 
                 onChange={e => setNewBudgetItem({...newBudgetItem, quantity: e.target.value})}
-                style={{ width: '100%', padding: '10px', backgroundColor: 'var(--bg-main)', color: 'white', borderRadius: '4px', border: '1px solid var(--border-color)' }} />
+                style={{ width: '100%', padding: '10px', backgroundColor: 'var(--bg-main)', color: 'var(--text-main)', borderRadius: '4px', border: '1px solid var(--border-color)' }} />
             </div>
             <button className="btn-primary" onClick={addBudgetItem} style={{ height: '40px' }}>Ekle</button>
           </div>
