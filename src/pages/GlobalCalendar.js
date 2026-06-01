@@ -12,14 +12,6 @@ import { Trash2 } from 'lucide-react';
 moment.locale('tr');
 const localizer = momentLocalizer(moment);
 
-const EVENT_COLORS = [
-  { label: 'Mavi (Genel)', value: '#3b82f6' },
-  { label: 'Kırmızı (Acil/Önemli)', value: '#ef4444' },
-  { label: 'Yeşil (Tamamlandı)', value: '#22c55e' },
-  { label: 'Turuncu (Toplantı)', value: '#f97316' },
-  { label: 'Mor (Tasarım/Mimari)', value: '#8b5cf6' },
-];
-
 export default function GlobalCalendar() {
   const { userData, currentUser } = useAuth();
   const [events, setEvents] = useState([]);
@@ -267,25 +259,22 @@ export default function GlobalCalendar() {
 
               <div>
                 <label style={{ display: 'block', fontSize: 13, marginBottom: 4, color: 'var(--text-muted)' }}>Etkinlik Rengi</label>
-                <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-                  {EVENT_COLORS.map(c => (
-                    <button 
-                      key={c.value}
-                      onClick={() => setFormData({...formData, color: c.value})}
-                      style={{
-                        padding: '8px 12px',
-                        borderRadius: '20px',
-                        border: formData.color === c.value ? '2px solid var(--text-main)' : '2px solid transparent',
-                        backgroundColor: c.value,
-                        color: '#fff',
-                        fontSize: '12px',
-                        fontWeight: '600',
-                        cursor: 'pointer'
-                      }}
-                    >
-                      {c.label}
-                    </button>
-                  ))}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <input 
+                    type="color" 
+                    value={formData.color} 
+                    onChange={e => setFormData({...formData, color: e.target.value})}
+                    style={{
+                      width: '40px',
+                      height: '40px',
+                      padding: '0',
+                      border: 'none',
+                      borderRadius: '8px',
+                      cursor: 'pointer',
+                      background: 'none'
+                    }}
+                  />
+                  <span style={{ fontSize: '13px', color: 'var(--text-main)', opacity: 0.8 }}>Özel renk seçebilirsiniz</span>
                 </div>
               </div>
 
