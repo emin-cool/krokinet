@@ -257,6 +257,25 @@ export default function PinDetailModal({ pin, projectId, isManager, onClose }) {
     }
   }
 
+  async function permanentDeletePin() {
+    if (!window.confirm('DİKKAT: Pin, mesajlar ve dosyalar tamamen SİLİNECEK! Emin misiniz?')) return;
+    try {
+      // Delete messages
+      for (const msg of messages) {
+        await deleteDoc(doc(db, 'messages', msg.id));
+      }
+      // Delete files
+      for (const file of files) {
+        await deleteDoc(doc(db, 'files', file.id));
+      }
+      // Delete pin
+      await deleteDoc(doc(db, 'pins', pin.id));
+      onClose();
+    } catch (err) {
+      console.error("Silinirken hata:", err);
+    }
+  }
+
   async function unarchivePin() {
     await updateDoc(doc(db, 'pins', pin.id), { isArchived: false });
     // Keep it open, no need to close
@@ -354,10 +373,16 @@ export default function PinDetailModal({ pin, projectId, isManager, onClose }) {
           )}
           <div className="pin-header-actions" style={{ alignSelf: 'flex-start', marginTop: editingHeader ? 4 : 0 }}>
             {isManager && pin.isArchived && (
-              <button className="btn-secondary" onClick={unarchivePin} style={{ marginRight: 8, fontSize: 13 }}>
-                📦 Arşivden Çıkar
-              </button>
+              <>
+                <button className="btn-secondary" onClick={unarchivePin} style={{ marginRight: 8, fontSize: 13 }}>
+                  Arşivden Çıkar
+                </button>
+                <button className="btn-danger" onClick={permanentDeletePin} title="Kalıcı Olarak Sil">
+                  <Trash2 size={18} />
+                </button>
+              </>
             )}
+            
             {isManager && !pin.isArchived && <button className="btn-danger" onClick={deletePin}><Trash2 size={18} /></button>}
             <button className="btn-secondary" onClick={onClose} style={{ padding: '8px 12px' }}>✕</button>
           </div>

@@ -8,6 +8,7 @@ import PinDetailModal from '../components/PinDetailModal';
 
 import ProjectGallery from '../components/ProjectGallery';
 import ProjectTeam from '../components/ProjectTeam';
+import ProjectSchedule from '../components/ProjectSchedule';
 import NotificationsDropdown from '../components/NotificationsDropdown';
 import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
 import { Building, Ruler, MessageSquare, Info, Users, MapPin, Archive, ArrowLeft, CalendarDays } from 'lucide-react';
@@ -19,7 +20,7 @@ const CATEGORY_COLORS = {
   'tesisat': '#22c55e', 
   'mekanik': '#f97316', 
   'mimari': '#a855f7', 
-  'joker': '#e11d48'
+  'joker': '#ec4899'
 };
 const CATEGORIES = Object.keys(CATEGORY_COLORS);
 
@@ -624,9 +625,14 @@ export default function ProjectDetail() {
                 {project.floorPlans.map((fp, i) => {
                   if (!fp.isArchived) return null;
                   return (
-                    <div key={i} style={{ padding: 16, border: '1px solid var(--border-color)', borderRadius: 8, background: 'var(--bg-main)', position: 'relative' }}>
-                      <p style={{ fontWeight: 'bold', marginBottom: 8 }}>{fp.name}</p>
-                      <button className="btn-secondary" onClick={() => toggleArchiveFloorPlan(i, fp.isArchived)} style={{ width: '100%' }}>Arşivden Çıkar</button>
+                    <div key={i} style={{ padding: 16, border: '1px solid var(--border-color)', borderRadius: 8, background: 'var(--bg-main)', position: 'relative', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      <p style={{ fontWeight: 'bold', margin: 0 }}>{fp.name}</p>
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <button className="btn-secondary" onClick={() => toggleArchiveFloorPlan(i, fp.isArchived)} style={{ flex: 1, fontSize: 13 }}>Arşivden Çıkar</button>
+                        <button onClick={() => deleteFloorPlan(i)} style={{ background: '#fef2f2', border: '1px solid #fecaca', color: '#ef4444', borderRadius: 6, padding: '0 8px', cursor: 'pointer' }} title="Kalıcı Sil">
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
                     </div>
                   );
                 })}
@@ -838,121 +844,7 @@ export default function ProjectDetail() {
       )}
 
       {activeTab === 'schedule' && (
-        <div style={{ padding: '24px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-            <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 700 }}>📅 İş Programı</h2>
-            {isManager && (
-              <button className="btn-primary" style={{ padding: '8px 16px', fontSize: 13 }} onClick={() => {
-                const title = prompt('İş kalemi adı:');
-                if (!title) return;
-                const startDate = prompt('Başlangıç tarihi (YYYY-MM-DD):');
-                const endDate = prompt('Bitiş tarihi (YYYY-MM-DD):');
-                const assignee = prompt('Sorumlu kişi:');
-                if (!startDate || !endDate) return;
-                const newTask = { title, startDate, endDate, assignee: assignee || '', status: 'beklemede', id: Date.now().toString() };
-                const updatedSchedule = [...(project.schedule || []), newTask];
-                updateDoc(doc(db, 'projects', projectId), { schedule: updatedSchedule }).then(() => fetchProject());
-              }}>+ Yeni İş Kalemi</button>
-            )}
-          </div>
-
-          {/* Takvim Görünümü */}
-          {(() => {
-            const schedule = project.schedule || [];
-            if (schedule.length === 0) return <div className="empty-state">Henüz iş programı eklenmemiş.</div>;
-            
-            const allDates = schedule.flatMap(t => [new Date(t.startDate), new Date(t.endDate)]);
-            const minDate = new Date(Math.min(...allDates));
-            const maxDate = new Date(Math.max(...allDates));
-            const totalDays = Math.ceil((maxDate - minDate) / (1000 * 60 * 60 * 24)) + 1;
-            
-            const months = [];
-            let current = new Date(minDate);
-            while (current <= maxDate) {
-              const monthKey = `${current.getFullYear()}-${current.getMonth()}`;
-              if (!months.find(m => m.key === monthKey)) {
-                months.push({ key: monthKey, label: current.toLocaleDateString('tr-TR', { month: 'short', year: 'numeric' }), start: new Date(current) });
-              }
-              current.setDate(current.getDate() + 1);
-            }
-
-            const statusColors = { 'beklemede': '#94a3b8', 'devam ediyor': '#3b82f6', 'tamamlandı': '#22c55e', 'gecikmiş': '#ef4444' };
-
-            return (
-              <div style={{ background: 'var(--bg-card)', borderRadius: 12, border: '1px solid var(--border-color)', overflow: 'hidden' }}>
-                {/* Header - ay göstergesi */}
-                <div style={{ display: 'flex', borderBottom: '1px solid var(--border-color)', background: 'var(--bg-surface)', fontSize: 11, color: 'var(--text-muted)', fontWeight: 600 }}>
-                  <div style={{ width: 200, minWidth: 200, padding: '8px 12px', borderRight: '1px solid var(--border-color)' }}>İş Kalemi</div>
-                  <div style={{ flex: 1, display: 'flex', position: 'relative' }}>
-                    {months.map(m => {
-                      const monthStart = m.start;
-                      const offsetDays = Math.ceil((monthStart - minDate) / (1000 * 60 * 60 * 24));
-                      return <span key={m.key} style={{ position: 'absolute', left: `${(offsetDays / totalDays) * 100}%`, padding: '8px 6px', whiteSpace: 'nowrap' }}>{m.label}</span>;
-                    })}
-                  </div>
-                </div>
-
-                {/* Görevler */}
-                {schedule.map((task, idx) => {
-                  const taskStart = new Date(task.startDate);
-                  const taskEnd = new Date(task.endDate);
-                  const startOffset = Math.ceil((taskStart - minDate) / (1000 * 60 * 60 * 24));
-                  const duration = Math.ceil((taskEnd - taskStart) / (1000 * 60 * 60 * 24)) + 1;
-                  const leftPercent = (startOffset / totalDays) * 100;
-                  const widthPercent = (duration / totalDays) * 100;
-                  const barColor = statusColors[task.status] || '#3b82f6';
-
-                  return (
-                    <div key={task.id || idx} style={{ display: 'flex', borderBottom: '1px solid var(--border-color)', minHeight: 44, alignItems: 'center' }}>
-                      <div style={{ width: 200, minWidth: 200, padding: '8px 12px', borderRight: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: 2 }}>
-                        <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-main)' }}>{task.title}</span>
-                        {task.assignee && <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{task.assignee}</span>}
-                      </div>
-                      <div style={{ flex: 1, position: 'relative', height: 28, margin: '0 8px' }}>
-                        <div 
-                          style={{ position: 'absolute', left: `${leftPercent}%`, width: `${Math.max(widthPercent, 1)}%`, height: '100%', background: barColor, borderRadius: 6, opacity: 0.85, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                          title={`${task.startDate} → ${task.endDate}`}
-                          onClick={() => {
-                            if (!isManager) return;
-                            const newStatus = prompt(`Durum değiştir (beklemede / devam ediyor / tamamlandı / gecikmiş):`, task.status);
-                            if (newStatus && ['beklemede', 'devam ediyor', 'tamamlandı', 'gecikmiş'].includes(newStatus)) {
-                              const updated = [...schedule];
-                              updated[idx] = { ...updated[idx], status: newStatus };
-                              updateDoc(doc(db, 'projects', projectId), { schedule: updated }).then(() => fetchProject());
-                            }
-                          }}
-                        >
-                          <span style={{ fontSize: 10, color: '#fff', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', padding: '0 6px' }}>{task.title}</span>
-                        </div>
-                      </div>
-                      {isManager && (
-                        <button 
-                          onClick={() => {
-                            if (window.confirm('Bu iş kalemini silmek istiyor musunuz?')) {
-                              const updated = schedule.filter((_, i) => i !== idx);
-                              updateDoc(doc(db, 'projects', projectId), { schedule: updated }).then(() => fetchProject());
-                            }
-                          }}
-                          style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '4px 8px', fontSize: 14, flexShrink: 0 }}
-                        >✕</button>
-                      )}
-                    </div>
-                  );
-                })}
-
-                {/* Durum göstergeleri */}
-                <div style={{ display: 'flex', gap: 16, padding: '10px 12px', borderTop: '1px solid var(--border-color)', flexWrap: 'wrap' }}>
-                  {Object.entries(statusColors).map(([s, c]) => (
-                    <div key={s} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--text-muted)' }}>
-                      <div style={{ width: 12, height: 12, borderRadius: 3, background: c }} />
-                      <span style={{ textTransform: 'capitalize' }}>{s}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            );
-          })()}
-        </div>
+        <ProjectSchedule project={project} projectId={projectId} fetchProject={fetchProject} isManager={isManager} />
       )}
 
       {activeTab === 'team' && <ProjectTeam projectId={projectId} isManager={canManageTeam} />}

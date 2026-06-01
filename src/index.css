@@ -2383,16 +2383,22 @@ body.keyboard-open .team-modal {
   padding-bottom: 120px !important;
 }
 
-/* react-big-calendar dark mode overrides */
+/* react-big-calendar overrides */
 .rbc-calendar { background: var(--bg-card); color: var(--text-main); font-family: var(--font-family); }
 .rbc-header { padding: 10px; font-weight: 600; border-bottom: 1px solid var(--border-color) !important; border-left: 1px solid var(--border-color) !important; }
-.rbc-month-view, .rbc-time-view { border: 1px solid var(--border-color); }
+.rbc-month-view, .rbc-time-view { border: 1px solid var(--border-color); background: var(--bg-card); }
 .rbc-day-bg + .rbc-day-bg { border-left: 1px solid var(--border-color); }
 .rbc-month-row + .rbc-month-row { border-top: 1px solid var(--border-color); }
-.rbc-off-range-bg { background: var(--bg-secondary); }
-.rbc-today { background: rgba(59, 130, 246, 0.1); }
+.rbc-off-range-bg { background: var(--bg-secondary); opacity: 0.5; }
+.rbc-today { background: var(--primary-glow); }
 .rbc-event { padding: 4px 8px; border-radius: 4px; }
 .rbc-button-link { color: var(--text-main); }
 .rbc-toolbar button { color: var(--text-main); border: 1px solid var(--border-color); background: var(--bg-main); border-radius: 6px; padding: 6px 12px; cursor: pointer; transition: 0.2s; }
 .rbc-toolbar button:hover, .rbc-toolbar button:active { background: var(--bg-secondary); }
 .rbc-toolbar button.rbc-active { background: var(--primary-color); color: white; border-color: var(--primary-color); }
+
+[data-theme="dark"] .rbc-off-range-bg { background: #141829; opacity: 1; }
+[data-theme="dark"] .rbc-today { background: rgba(99, 102, 241, 0.15); }
+[data-theme="dark"] .rbc-day-bg { background: var(--bg-card); }
+[data-theme="dark"] .rbc-header { background: var(--bg-surface); }
+[data-theme="dark"] .rbc-date-cell { padding-right: 5px; color: var(--text-main); }
