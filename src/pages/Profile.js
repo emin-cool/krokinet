@@ -74,9 +74,11 @@ export default function Profile() {
             <ArrowLeft size={20} />
           </button>
           <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-          <img src="/logo.png" alt="Şanti Logo" style={{ width: '56px', height: '56px', borderRadius: '16px', objectFit: 'cover', border: '1px solid var(--border-color)', boxShadow: 'var(--shadow-md)' }} />
+          <div className="app-logo-container" style={{ width: '56px', height: '56px' }}>
+            <img src="/logo.png" alt="Yapı Chat Logo" />
+          </div>
           <div>
-            <h1 className="app-logo-text" style={{ margin: 0 }}>Şanti</h1>
+            <h1 className="app-logo-text" style={{ margin: 0 }}>Yapı Chat</h1>
             <p style={{ margin: 0, fontSize: '0.875rem', color: 'var(--text-muted)' }}>Ana Sayfaya Dön</p>
           </div>
         </div>

@@ -30,8 +30,10 @@ export default function Login() {
     <div className="login-container">
       <div className="login-box">
         <div className="login-logo" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px', gap: '12px' }}>
-          <img src="/logo.png" alt="Şanti Logo" style={{ width: '84px', height: '84px', borderRadius: '22px', objectFit: 'cover', boxShadow: '0 8px 24px rgba(99, 102, 241, 0.35)' }} />
-          <h1 className="app-logo-text">Şanti</h1>
+          <div className="app-logo-container" style={{ width: '84px', height: '84px', borderRadius: '22px', boxShadow: '0 8px 24px rgba(99, 102, 241, 0.35)' }}>
+            <img src="/logo.png" alt="Yapı Chat Logo" />
+          </div>
+          <h1 className="app-logo-text">Yapı Chat</h1>
         </div>
         <p>Hesabınıza giriş yapın</p>
         {error && <div className="error-msg">{error}</div>}

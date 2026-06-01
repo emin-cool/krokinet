@@ -58,9 +58,11 @@ export default function Projects() {
       {/* Header */}
       <div className="projects-top-header">
         <div className="projects-top-left" style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-          <img src="/logo.png" alt="Şanti Logo" style={{ width: '56px', height: '56px', borderRadius: '16px', objectFit: 'cover', border: '1px solid var(--border-color)', boxShadow: 'var(--shadow-md)' }} />
+          <div className="app-logo-container" style={{ width: '56px', height: '56px' }}>
+            <img src="/logo.png" alt="Yapı Chat Logo" />
+          </div>
           <div>
-            <h1 className="app-logo-text">Şanti</h1>
+            <h1 className="app-logo-text">Yapı Chat</h1>
             <p>{userData?.name} ({userData?.role})</p>
           </div>
         </div>

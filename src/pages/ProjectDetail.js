@@ -18,8 +18,7 @@ const CATEGORY_COLORS = {
   'tesisat': '#22c55e', 
   'mekanik': '#f97316', 
   'mimari': '#a855f7', 
-  'genel': '#3b82f6', 
-  'diğer': '#64748b'
+  'joker': '#e11d48'
 };
 const CATEGORIES = Object.keys(CATEGORY_COLORS);
 
@@ -365,7 +364,9 @@ export default function ProjectDetail() {
             <ArrowLeft size={20} />
           </button>
           <div className="projects-top-left" style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-            <img src="/logo.png" alt="Şanti Logo" style={{ width: '56px', height: '56px', borderRadius: '16px', objectFit: 'cover', border: '1px solid var(--border-color)', boxShadow: 'var(--shadow-md)' }} />
+            <div className="app-logo-container" style={{ width: '56px', height: '56px' }}>
+              <img src="/logo.png" alt="Yapı Chat Logo" />
+            </div>
             <div>
               <h1 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 800, color: 'var(--text-main)', letterSpacing: '-0.02em' }}>{project.name}</h1>
               <p style={{ margin: 0, fontSize: '0.875rem', color: 'var(--text-muted)' }}>{userData?.name} ({userData?.role})</p>
@@ -488,14 +489,23 @@ export default function ProjectDetail() {
                   onChange={e => setPinSearch(e.target.value)}
                   style={{ flex: 1, padding: '8px 12px', borderRadius: 6, border: '1px solid var(--border-color)', background: 'var(--bg-main)', color: 'var(--text-main)' }}
                 />
-                <select 
-                  value={categoryFilter} 
-                  onChange={e => setCategoryFilter(e.target.value)}
-                  style={{ padding: '8px 12px', borderRadius: 6, border: '1px solid var(--border-color)', width: 160, background: 'var(--bg-main)', color: 'var(--text-main)', textTransform: 'capitalize' }}
-                >
-                  <option value="all">Tüm İşler</option>
-                  {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-                </select>
+                <div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 4, flex: 1, minWidth: 200, WebkitOverflowScrolling: 'touch', msOverflowStyle: 'none', scrollbarWidth: 'none' }} className="hide-scrollbar">
+                  <button 
+                    onClick={() => setCategoryFilter('all')}
+                    style={{ padding: '6px 12px', borderRadius: 20, border: '1px solid var(--border-color)', background: categoryFilter === 'all' ? '#3b82f6' : 'var(--bg-main)', color: categoryFilter === 'all' ? '#fff' : 'var(--text-main)', fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', cursor: 'pointer', transition: '0.2s' }}
+                  >
+                    Genel
+                  </button>
+                  {CATEGORIES.map(c => (
+                    <button 
+                      key={c}
+                      onClick={() => setCategoryFilter(c)}
+                      style={{ padding: '6px 12px', borderRadius: 20, border: `1px solid ${categoryFilter === c ? CATEGORY_COLORS[c] : 'var(--border-color)'}`, background: categoryFilter === c ? CATEGORY_COLORS[c] : 'var(--bg-main)', color: categoryFilter === c ? '#fff' : 'var(--text-main)', fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', cursor: 'pointer', transition: '0.2s', textTransform: 'capitalize' }}
+                    >
+                      {c}
+                    </button>
+                  ))}
+                </div>
                 <select 
                   value={pinFilter} 
                   onChange={e => setPinFilter(e.target.value)}
@@ -515,20 +525,14 @@ export default function ProjectDetail() {
                 limitToBounds={true}
                 centerZoomedOut={true}
                 disabled={addingPin && !newPinCoords}
+                pinch={{ disabled: true }}
+                wheel={{ disabled: true }}
+                doubleClick={{ disabled: true }}
               >
                 {({ zoomIn, zoomOut, resetTransform }) => (
                   <div style={{ position: 'relative', width: '100%', height: '100%' }}>
                     
-                    {/* Lejant (Kategori Renkleri) */}
-                    <div style={{ position: 'absolute', top: 16, left: 16, zIndex: 100, background: 'var(--bg-main)', padding: '12px', borderRadius: '12px', border: '1px solid var(--border-color)', boxShadow: '0 4px 6px rgba(0,0,0,0.1)', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                      <span style={{ fontSize: 12, fontWeight: 'bold', color: 'var(--text-muted)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: 0.5 }}>İş Türleri</span>
-                      {Object.entries(CATEGORY_COLORS).map(([cat, col]) => (
-                        <div key={cat} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                          <div style={{ width: 14, height: 14, borderRadius: '50%', background: col }} />
-                          <span style={{ fontSize: 13, color: 'var(--text-main)', textTransform: 'capitalize' }}>{cat}</span>
-                        </div>
-                      ))}
-                    </div>
+                    {/* Lejant (Kategori Renkleri) kaldırıldı - Üstteki butonlar yerine geçiyor */}
 
                     <div className="zoom-controls">
                       <button className="zoom-btn" onClick={() => zoomIn()}>+</button>

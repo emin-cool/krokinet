@@ -127,6 +127,28 @@ body {
    Body: 14-15px / 400-500 — okunaklı
    Caption: 12-13px / 500
    ═══════════════════════════════════════════════════════ */
+/* Hide scrollbar for horizontal scroll containers */
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* Crop the logo to show only the blue rounded square */
+.app-logo-container {
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 16px;
+  border: 1px solid var(--border-color);
+  box-shadow: var(--shadow-md);
+  flex-shrink: 0;
+}
+.app-logo-container img {
+  width: 125%;
+  height: 125%;
+  object-fit: cover;
+}
+
 h1 {
   font-size: 2rem;
   font-weight: 800;
