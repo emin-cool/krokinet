@@ -11,7 +11,7 @@ import ProjectTeam from '../components/ProjectTeam';
 import ProjectSchedule from '../components/ProjectSchedule';
 import NotificationsDropdown from '../components/NotificationsDropdown';
 import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
-import { Building, Ruler, MessageSquare, Info, Users, MapPin, Archive, ArrowLeft, CalendarDays } from 'lucide-react';
+import { Building, Ruler, MessageSquare, Info, Users, MapPin, Archive, ArrowLeft, CalendarDays, Trash2 } from 'lucide-react';
 
 const PIN_COLORS = { 'açık': '#ef4444', 'devam ediyor': '#f59e0b', 'çözüldü': '#22c55e' };
 const CATEGORY_COLORS = {

@@ -220,6 +220,7 @@ export default function ProjectSchedule({ project, projectId, fetchProject, isMa
     };
 
     let newSchedule = [...schedule];
+    let timeDiff = 0;
 
     if (editingTask) {
       const idx = newSchedule.findIndex(t => t.id === editingTask.id);
@@ -227,7 +228,7 @@ export default function ProjectSchedule({ project, projectId, fetchProject, isMa
         newSchedule[idx] = { ...newSchedule[idx], ...taskData };
       }
       const oldStart = editingTask.start;
-      const timeDiff = startDateTime.getTime() - oldStart.getTime();
+      timeDiff = startDateTime.getTime() - oldStart.getTime();
       if (timeDiff !== 0) {
         newSchedule = cascadeDelayLocally(editingTask.id, timeDiff, newSchedule);
       }
