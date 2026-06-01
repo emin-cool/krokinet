@@ -237,3 +237,19 @@
   color: var(--text-inverse);
   transform: scale(1.05);
 }
+
+/* Mobile Optimizations */
+@media (max-width: 768px) {
+  .pin-marker-custom {
+    width: 20px;
+    height: 20px;
+  }
+  .pin-marker-custom::after {
+    width: 8px;
+    height: 8px;
+  }
+  .zoom-controls {
+    right: auto;
+    left: 20px;
+  }
+}

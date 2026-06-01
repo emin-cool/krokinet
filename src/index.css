@@ -2183,7 +2183,17 @@ p {
   .pin-modal, .modal, .team-modal {
     max-height: 95vh;
     border-radius: var(--radius-lg);
-    padding: 24px;
+    padding: 16px;
+  }
+  
+  /* Prevent iOS Auto-Zoom */
+  input, select, textarea {
+    font-size: 16px !important;
+  }
+  
+  /* Touch targets minimum size */
+  .btn-primary, .btn-secondary, .floor-tab, .tab, .projects-tab {
+    min-height: 44px;
   }
   .tab, .projects-tab {
     padding: 14px 16px;
