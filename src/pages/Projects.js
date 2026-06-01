@@ -6,8 +6,9 @@ import { signOut } from 'firebase/auth';
 import { useAuth } from '../contexts/AuthContext';
 import MarketPrices from './MarketPrices';
 import BudgetCalculator from './BudgetCalculator';
+import GlobalCalendar from './GlobalCalendar';
 import NotificationsDropdown from '../components/NotificationsDropdown';
-import { Building, Building2, FolderKanban, TrendingUp, Calculator, MapPin, Plus } from 'lucide-react';
+import { Building, Building2, FolderKanban, TrendingUp, Calculator, MapPin, Plus, CalendarDays } from 'lucide-react';
 
 export default function Projects() {
   const [projects, setProjects] = useState([]);
@@ -83,6 +84,10 @@ export default function Projects() {
         <button className={activeSection === 'projects' ? 'projects-tab active' : 'projects-tab'}
           onClick={() => setActiveSection('projects')}>
           <FolderKanban size={18} /> Projelerim
+        </button>
+        <button className={activeSection === 'calendar' ? 'projects-tab active' : 'projects-tab'}
+          onClick={() => setActiveSection('calendar')}>
+          <CalendarDays size={18} /> İş Programı
         </button>
         <button className={activeSection === 'market' ? 'projects-tab active' : 'projects-tab'}
           onClick={() => setActiveSection('market')}>
@@ -177,6 +182,8 @@ export default function Projects() {
       {activeSection === 'market' && <MarketPrices />}
       
       {activeSection === 'budget' && <BudgetCalculator />}
+
+      {activeSection === 'calendar' && <GlobalCalendar />}
     </div>
   );
 }
