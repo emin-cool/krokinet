@@ -2381,6 +2381,7 @@ body.keyboard-open .pin-modal,
 body.keyboard-open .team-modal {
   max-height: 95vh !important;
   padding-bottom: 120px !important;
+}
 
 /* react-big-calendar dark mode overrides */
 .rbc-calendar { background: var(--bg-card); color: var(--text-main); font-family: var(--font-family); }

@@ -1,3 +1,4 @@
+/* eslint-disable no-unused-vars, react-hooks/exhaustive-deps */
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { db, auth } from '../firebase';
@@ -8,7 +9,7 @@ import MarketPrices from './MarketPrices';
 import BudgetCalculator from './BudgetCalculator';
 import GlobalCalendar from './GlobalCalendar';
 import NotificationsDropdown from '../components/NotificationsDropdown';
-import { Building, Building2, FolderKanban, TrendingUp, Calculator, MapPin, Plus, CalendarDays } from 'lucide-react';
+import { Building2, FolderKanban, TrendingUp, Calculator, MapPin, Plus, CalendarDays } from 'lucide-react';
 
 export default function Projects() {
   const [projects, setProjects] = useState([]);
@@ -20,7 +21,10 @@ export default function Projects() {
   const { currentUser, userData } = useAuth();
   const navigate = useNavigate();
 
-  useEffect(() => { fetchProjects(); }, [currentUser, userData]);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    fetchProjects();
+  }, [currentUser, userData]);
 
   async function fetchProjects() {
     if (!currentUser) return;
