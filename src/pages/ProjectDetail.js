@@ -364,10 +364,10 @@ export default function ProjectDetail() {
           >
             <ArrowLeft size={20} />
           </button>
-          <div className="projects-top-left" style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '16px' }} onClick={() => navigate('/')}>
-            <img src="/logo.png" alt="Şanti Logo" style={{ width: '48px', height: '48px', borderRadius: '12px', objectFit: 'cover', border: '1px solid var(--border-color)', boxShadow: 'var(--shadow-sm)' }} />
+          <div className="projects-top-left" style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+            <img src="/logo.png" alt="Şanti Logo" style={{ width: '56px', height: '56px', borderRadius: '16px', objectFit: 'cover', border: '1px solid var(--border-color)', boxShadow: 'var(--shadow-md)' }} />
             <div>
-              <h1 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 700, color: 'var(--text-main)' }}>{project.name}</h1>
+              <h1 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 800, color: 'var(--text-main)', letterSpacing: '-0.02em' }}>{project.name}</h1>
               <p style={{ margin: 0, fontSize: '0.875rem', color: 'var(--text-muted)' }}>{userData?.name} ({userData?.role})</p>
             </div>
           </div>

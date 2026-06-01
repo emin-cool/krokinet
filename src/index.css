@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Outfit:wght@600;700;800;900&display=swap');
 @import url('./premium-plan.css');
 
 /* ═══════════════════════════════════════════════════════
@@ -626,6 +626,17 @@ p {
 .app-logo {
   font-size: 40px;
   filter: drop-shadow(0 0 12px var(--primary-glow));
+}
+
+.app-logo-text {
+  font-family: 'Outfit', sans-serif;
+  font-size: 1.75rem !important;
+  font-weight: 800 !important;
+  letter-spacing: -0.04em !important;
+  background: linear-gradient(135deg, var(--text-main) 0%, var(--primary-color) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  display: inline-block;
 }
 
 .projects-top-left h1 {

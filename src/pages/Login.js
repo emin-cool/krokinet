@@ -29,10 +29,10 @@ export default function Login() {
   return (
     <div className="login-container">
       <div className="login-box">
-        <div className="login-logo" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
-          <img src="/logo.png" alt="Şanti Logo" style={{ width: '80px', height: '80px', borderRadius: '16px', objectFit: 'cover' }} />
+        <div className="login-logo" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px', gap: '12px' }}>
+          <img src="/logo.png" alt="Şanti Logo" style={{ width: '84px', height: '84px', borderRadius: '22px', objectFit: 'cover', boxShadow: '0 8px 24px rgba(99, 102, 241, 0.35)' }} />
+          <h1 className="app-logo-text">Şanti</h1>
         </div>
-        <h1>Şanti</h1>
         <p>Hesabınıza giriş yapın</p>
         {error && <div className="error-msg">{error}</div>}
         <form onSubmit={handleSubmit}>

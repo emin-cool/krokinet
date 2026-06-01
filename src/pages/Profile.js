@@ -73,13 +73,13 @@ export default function Profile() {
           >
             <ArrowLeft size={20} />
           </button>
-          <div className="projects-top-left" style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '16px' }} onClick={() => navigate('/')}>
-            <img src="/logo.png" alt="Şanti Logo" style={{ width: '48px', height: '48px', borderRadius: '12px', objectFit: 'cover', border: '1px solid var(--border-color)' }} />
-            <div>
-              <h1 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 700, color: 'var(--text-main)' }}>Şanti</h1>
-              <p style={{ margin: 0, fontSize: '0.875rem', color: 'var(--text-muted)' }}>Ana Sayfaya Dön</p>
-            </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+          <img src="/logo.png" alt="Şanti Logo" style={{ width: '56px', height: '56px', borderRadius: '16px', objectFit: 'cover', border: '1px solid var(--border-color)', boxShadow: 'var(--shadow-md)' }} />
+          <div>
+            <h1 className="app-logo-text" style={{ margin: 0 }}>Şanti</h1>
+            <p style={{ margin: 0, fontSize: '0.875rem', color: 'var(--text-muted)' }}>Ana Sayfaya Dön</p>
           </div>
+        </div>
         </div>
         <div className="header-actions">
           <button className="btn-secondary" onClick={() => signOut(auth)}>Çıkış</button>
