@@ -9,7 +9,7 @@ import ProjectGallery from '../components/ProjectGallery';
 import ProjectTeam from '../components/ProjectTeam';
 import NotificationsDropdown from '../components/NotificationsDropdown';
 import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
-import { Building, Ruler, MessageSquare, Info, Users, MapPin, Archive, ArrowLeft } from 'lucide-react';
+import { Building, Ruler, MessageSquare, Info, Users, MapPin, Archive, ArrowLeft, CalendarDays } from 'lucide-react';
 
 const PIN_COLORS = { 'açık': '#ef4444', 'devam ediyor': '#f59e0b', 'çözüldü': '#22c55e' };
 const CATEGORY_COLORS = {
@@ -383,9 +383,12 @@ export default function ProjectDetail() {
         <button className={activeTab === 'plan' ? 'tab active' : 'tab'} onClick={() => setActiveTab('plan')}>
           <Ruler size={16} style={{ marginRight: '6px' }} /> Kat Planı
         </button>
-        <button className={activeTab === 'info' ? 'projects-tab active' : 'projects-tab'}
+        <button className={activeTab === 'info' ? 'tab active' : 'tab'}
           onClick={() => setActiveTab('info')}>
           <Info size={16} style={{ marginRight: '6px' }} /> Proje Bilgileri
+        </button>
+        <button className={activeTab === 'schedule' ? 'tab active' : 'tab'} onClick={() => setActiveTab('schedule')}>
+          <CalendarDays size={16} style={{ marginRight: '6px' }} /> İş Programı
         </button>
         <button className={activeTab === 'team' ? 'tab active' : 'tab'} onClick={() => setActiveTab('team')}>
           <Users size={16} style={{ marginRight: '6px' }} /> Ekip
@@ -433,66 +436,68 @@ export default function ProjectDetail() {
                 )}
               </div>
             )})}
+            {isManager && (
+              <>
+                <button className="btn-primary desktop-new-pin-btn" onClick={() => setAddingPin(!addingPin)} style={{ padding: '6px 14px', fontSize: 12, borderRadius: 8 }}>
+                  {addingPin ? '✕' : '📍 Pin'}
+                </button>
+                <button className="fab-button" onClick={() => setAddingPin(!addingPin)}>
+                  {addingPin ? '✕' : '+'}
+                </button>
+                <label style={{ padding: '6px 14px', fontSize: 12, borderRadius: 8, cursor: 'pointer', background: 'var(--bg-card)', border: '1px solid var(--border-color)', color: 'var(--text-main)', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' }} className="hide-on-mobile">
+                  {uploadingPlan ? '...' : '🗺️ Plan'}
+                  <input type="file" hidden accept="image/*,.pdf" onChange={uploadFloorPlan} />
+                </label>
+              </>
+            )}
           </div>
 
-          <div className="plan-toolbar">
-              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                {isManager && project.floorPlans && project.floorPlans.length > 0 && (
-                  <>
-                    <button className="btn-primary desktop-new-pin-btn" onClick={() => setAddingPin(!addingPin)}>
-                      {addingPin ? '✕ İptal' : '📍 Yeni Pin (Sorun/İş)'}
-                    </button>
-                    <button className="fab-button" onClick={() => setAddingPin(!addingPin)}>
-                      {addingPin ? '✕' : '+'}
-                    </button>
-                  </>
-                )}
-              </div>
-            {addingPin && (
-              <div className="pin-form">
-                {!newPinCoords ? (
-                  <span className="pin-hint">👆 Plana tıklayarak konum seçin</span>
-                ) : (
-                  <>
-                    <input placeholder="Pin başlığı *" value={newPinData.title}
-                      onChange={e => setNewPinData({...newPinData, title: e.target.value})} />
-                    <select value={newPinData.category}
-                      onChange={e => {
-                        const newCat = e.target.value;
-                        setNewPinData({...newPinData, category: newCat, color: CATEGORY_COLORS[newCat]});
-                      }}>
-                      <option value="" disabled>İş Türü Seçin</option>
-                      {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-                    </select>
-                    <button className="btn-primary" onClick={savePin}>Kaydet</button>
-                  </>
-                )}
-                <button className="btn-secondary" onClick={() => { setAddingPin(false); setNewPinCoords(null); }}>İptal</button>
-              </div>
-            )}
-            {isManager && (
-              <label className="btn-secondary" style={{ cursor: 'pointer' }}>
-                {uploadingPlan ? 'Yükleniyor...' : '🗺️ Plan Yükle'}
-                <input type="file" hidden accept="image/*,.pdf" onChange={uploadFloorPlan} />
-              </label>
-            )}
-          </div>
+          {addingPin && (
+            <div className="pin-form" style={{ margin: '0 0 12px 0' }}>
+              {!newPinCoords ? (
+                <span className="pin-hint">👆 Plana tıklayarak konum seçin</span>
+              ) : (
+                <>
+                  <input placeholder="Pin başlığı *" value={newPinData.title}
+                    onChange={e => setNewPinData({...newPinData, title: e.target.value})} />
+                  <select value={newPinData.category}
+                    onChange={e => {
+                      const newCat = e.target.value;
+                      setNewPinData({...newPinData, category: newCat, color: CATEGORY_COLORS[newCat]});
+                    }}>
+                    <option value="" disabled>İş Türü Seçin</option>
+                    {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                  <button className="btn-primary" onClick={savePin}>Kaydet</button>
+                </>
+              )}
+              <button className="btn-secondary" onClick={() => { setAddingPin(false); setNewPinCoords(null); }}>İptal</button>
+            </div>
+          )}
 
           {floorPlans.length === 0 ? (
             <div className="empty-state">Henüz kat planı yüklenmemiş.</div>
           ) : (
             <div style={{ borderRadius: '12px', overflow: 'hidden', border: '1px solid var(--border-color)', position: 'relative' }}>
-              <div style={{ display: 'flex', gap: 10, padding: '16px', alignItems: 'center', background: 'var(--bg-secondary)', borderBottom: '1px solid var(--border-color)' }}>
-                <input 
-                  placeholder="🔍 Pin Ara (Başlık veya Sorumlu)" 
-                  value={pinSearch} 
-                  onChange={e => setPinSearch(e.target.value)}
-                  style={{ flex: 1, padding: '8px 12px', borderRadius: 6, border: '1px solid var(--border-color)', background: 'var(--bg-main)', color: 'var(--text-main)' }}
-                />
-                <div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 4, flex: 1, minWidth: 200, WebkitOverflowScrolling: 'touch', msOverflowStyle: 'none', scrollbarWidth: 'none' }} className="hide-scrollbar">
+              <div style={{ display: 'flex', gap: 8, padding: '10px 16px', alignItems: 'center', background: 'var(--bg-secondary)', borderBottom: '1px solid var(--border-color)', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <button 
+                    onClick={() => { const el = document.getElementById('pin-search-input'); if(el) { el.style.display = el.style.display === 'none' ? 'block' : 'none'; if(el.style.display === 'block') el.focus(); } }}
+                    style={{ background: 'none', border: '1px solid var(--border-color)', borderRadius: 8, padding: '6px 8px', cursor: 'pointer', color: 'var(--text-muted)', fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                    title="Pin Ara"
+                  >🔍</button>
+                  <input 
+                    id="pin-search-input"
+                    placeholder="Ara..." 
+                    value={pinSearch} 
+                    onChange={e => setPinSearch(e.target.value)}
+                    style={{ display: pinSearch ? 'block' : 'none', padding: '6px 10px', borderRadius: 6, border: '1px solid var(--border-color)', background: 'var(--bg-main)', color: 'var(--text-main)', width: 120, fontSize: 13 }}
+                  />
+                </div>
+                <div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 4, flex: 1, WebkitOverflowScrolling: 'touch', msOverflowStyle: 'none', scrollbarWidth: 'none' }} className="hide-scrollbar">
                   <button 
                     onClick={() => setCategoryFilter('all')}
-                    style={{ padding: '6px 12px', borderRadius: 20, border: '1px solid var(--border-color)', background: categoryFilter === 'all' ? '#3b82f6' : 'var(--bg-main)', color: categoryFilter === 'all' ? '#fff' : 'var(--text-main)', fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', cursor: 'pointer', transition: '0.2s' }}
+                    style={{ padding: '5px 14px', borderRadius: 20, border: categoryFilter === 'all' ? '2px solid #3b82f6' : '1px solid rgba(59,130,246,0.3)', background: 'rgba(59,130,246,0.15)', color: '#3b82f6', fontSize: 12, fontWeight: 700, whiteSpace: 'nowrap', cursor: 'pointer', transition: '0.2s', opacity: categoryFilter === 'all' ? 1 : 0.6 }}
                   >
                     Genel
                   </button>
@@ -500,22 +505,12 @@ export default function ProjectDetail() {
                     <button 
                       key={c}
                       onClick={() => setCategoryFilter(c)}
-                      style={{ padding: '6px 12px', borderRadius: 20, border: `1px solid ${categoryFilter === c ? CATEGORY_COLORS[c] : 'var(--border-color)'}`, background: categoryFilter === c ? CATEGORY_COLORS[c] : 'var(--bg-main)', color: categoryFilter === c ? '#fff' : 'var(--text-main)', fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', cursor: 'pointer', transition: '0.2s', textTransform: 'capitalize' }}
+                      style={{ padding: '5px 14px', borderRadius: 20, border: categoryFilter === c ? `2px solid ${CATEGORY_COLORS[c]}` : `1px solid ${CATEGORY_COLORS[c]}40`, background: `${CATEGORY_COLORS[c]}20`, color: CATEGORY_COLORS[c], fontSize: 12, fontWeight: 700, whiteSpace: 'nowrap', cursor: 'pointer', transition: '0.2s', textTransform: 'capitalize', opacity: categoryFilter === c ? 1 : 0.6 }}
                     >
                       {c}
                     </button>
                   ))}
                 </div>
-                <select 
-                  value={pinFilter} 
-                  onChange={e => setPinFilter(e.target.value)}
-                  style={{ padding: '8px 12px', borderRadius: 6, border: '1px solid var(--border-color)', width: 200, background: 'var(--bg-main)', color: 'var(--text-main)' }}
-                >
-                  <option value="all">Tüm Durumlar</option>
-                  <option value="open">🔴 Sadece Açıklar</option>
-                  <option value="resolved">🟢 Çözülenler</option>
-                  <option value="mine">👤 Bana Atananlar</option>
-                </select>
               </div>
 
               <TransformWrapper
@@ -736,55 +731,90 @@ export default function ProjectDetail() {
               </div>
             </div>
           ) : (
-            <div className="project-dashboard">
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-                <div className="dashboard-card">
-                  <div className="dashboard-card-title">📊 PROJE İLERLEMESİ</div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
-                    <span className={`status-label ${project.status?.toLowerCase().replace(' ', '') || 'devamediyor'}`}>{project.status?.toUpperCase() || 'DEVAM EDİYOR'}</span>
-                    <span style={{ fontSize: 28, fontWeight: 800, color: 'var(--primary-color)' }}>%{project.progress || 0}</span>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                {/* İlerleme */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 18px', borderRadius: 10, background: 'var(--bg-card)', border: '1px solid var(--border-color)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <span style={{ fontSize: 18 }}>📊</span>
+                    <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-main)' }}>İlerleme</span>
+                    <span className={`status-label ${project.status?.toLowerCase().replace(' ', '') || 'devamediyor'}`} style={{ fontSize: 11, padding: '2px 8px' }}>{project.status?.toUpperCase() || 'DEVAM EDİYOR'}</span>
                   </div>
-                  <div className="progress-container">
-                    <div className="progress-fill" style={{ width: `${project.progress || 0}%` }}></div>
-                  </div>
-                </div>
-
-                <div className="dashboard-card">
-                  <div className="dashboard-card-title">📋 GENEL BİLGİLER</div>
-                  <div className="dashboard-stat-row">
-                    <span className="dashboard-stat-label">Açıklama</span>
-                    <span className="dashboard-stat-value">{project.description || '-'}</span>
-                  </div>
-                  <div className="dashboard-stat-row">
-                    <span className="dashboard-stat-label">Adres</span>
-                    <span className="dashboard-stat-value">📍 {project.address || '-'}</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <div style={{ width: 120, height: 6, background: 'var(--bg-secondary)', borderRadius: 3, overflow: 'hidden' }}>
+                      <div style={{ width: `${project.progress || 0}%`, height: '100%', background: 'var(--primary-color)', borderRadius: 3, transition: '0.3s' }} />
+                    </div>
+                    <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--primary-color)' }}>%{project.progress || 0}</span>
                   </div>
                 </div>
 
-                <div className="dashboard-card">
-                  <div className="dashboard-card-title">📝 NOTLAR</div>
-                  <p style={{ fontSize: 14, color: 'var(--text-main)', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>{project.notes || 'Henüz not eklenmemiş.'}</p>
+                {/* Açıklama */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 18px', borderRadius: 10, background: 'var(--bg-card)', border: '1px solid var(--border-color)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <span style={{ fontSize: 18 }}>📋</span>
+                    <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>Açıklama</span>
+                  </div>
+                  <span style={{ fontSize: 14, color: 'var(--text-main)', fontWeight: 500 }}>{project.description || '-'}</span>
                 </div>
 
-                <div className="dashboard-card">
-                  <div className="dashboard-card-title">📁 PROJE DOSYALARI (DWG, Render, PDF vs.)</div>
-                  {isManager && (
-                    <label className="btn-secondary" style={{ cursor: 'pointer', display: 'inline-block', marginBottom: 16 }}>
-                      {uploadingProjectFile ? 'Yükleniyor...' : '➕ Yeni Dosya Yükle'}
-                      <input type="file" hidden onChange={uploadProjectFile} />
-                    </label>
-                  )}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {/* Adres */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 18px', borderRadius: 10, background: 'var(--bg-card)', border: '1px solid var(--border-color)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <span style={{ fontSize: 18 }}>📍</span>
+                    <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>Adres</span>
+                  </div>
+                  <span style={{ fontSize: 14, color: 'var(--text-main)', fontWeight: 500 }}>{project.address || '-'}</span>
+                </div>
+
+                {/* Tarih */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 18px', borderRadius: 10, background: 'var(--bg-card)', border: '1px solid var(--border-color)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <span style={{ fontSize: 18 }}>📅</span>
+                    <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>Başlangıç</span>
+                  </div>
+                  <span style={{ fontSize: 14, color: 'var(--text-main)', fontWeight: 500 }}>{project.startDate || '-'}</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 18px', borderRadius: 10, background: 'var(--bg-card)', border: '1px solid var(--border-color)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <span style={{ fontSize: 18 }}>🏁</span>
+                    <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>Hedef Bitiş</span>
+                  </div>
+                  <span style={{ fontSize: 14, color: 'var(--text-main)', fontWeight: 500 }}>{project.endDate || '-'}</span>
+                </div>
+
+                {/* Notlar */}
+                <div style={{ padding: '14px 18px', borderRadius: 10, background: 'var(--bg-card)', border: '1px solid var(--border-color)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+                    <span style={{ fontSize: 18 }}>📝</span>
+                    <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-muted)' }}>Notlar</span>
+                  </div>
+                  <p style={{ fontSize: 14, color: 'var(--text-main)', lineHeight: 1.6, whiteSpace: 'pre-wrap', margin: 0 }}>{project.notes || 'Henüz not eklenmemiş.'}</p>
+                </div>
+
+                {/* Dosyalar */}
+                <div style={{ padding: '14px 18px', borderRadius: 10, background: 'var(--bg-card)', border: '1px solid var(--border-color)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <span style={{ fontSize: 18 }}>📁</span>
+                      <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-muted)' }}>Proje Dosyaları</span>
+                    </div>
+                    {isManager && (
+                      <label style={{ padding: '4px 12px', fontSize: 12, borderRadius: 6, cursor: 'pointer', background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', color: 'var(--text-main)', fontWeight: 600 }}>
+                        {uploadingProjectFile ? '...' : '+ Dosya'}
+                        <input type="file" hidden onChange={uploadProjectFile} />
+                      </label>
+                    )}
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                     {(project.projectFiles || []).length === 0 ? (
-                      <p style={{ fontSize: 13, color: 'var(--text-muted)' }}>Henüz dosya yüklenmemiş.</p>
+                      <p style={{ fontSize: 13, color: 'var(--text-muted)', margin: 0 }}>Henüz dosya yüklenmemiş.</p>
                     ) : (
                       project.projectFiles.map((f, i) => (
-                        <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-main)', padding: '10px 14px', borderRadius: 8, border: '1px solid var(--border-color)' }}>
-                          <span style={{ fontSize: 14, color: 'var(--text-main)', wordBreak: 'break-all' }}>{f.name}</span>
-                          <div style={{ display: 'flex', gap: 8 }}>
-                            <a href={f.url} target="_blank" rel="noreferrer" className="btn-primary" style={{ padding: '6px 12px', textDecoration: 'none', fontSize: 12 }}>İndir</a>
+                        <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-main)', padding: '8px 12px', borderRadius: 6, border: '1px solid var(--border-color)' }}>
+                          <span style={{ fontSize: 13, color: 'var(--text-main)', wordBreak: 'break-all' }}>{f.name}</span>
+                          <div style={{ display: 'flex', gap: 6 }}>
+                            <a href={f.url} target="_blank" rel="noreferrer" style={{ padding: '4px 10px', textDecoration: 'none', fontSize: 11, background: 'var(--primary-color)', color: '#fff', borderRadius: 4 }}>İndir</a>
                             {isManager && (
-                              <button className="btn-danger" style={{ padding: '6px 12px', fontSize: 12 }} onClick={async () => {
+                              <button style={{ padding: '4px 10px', fontSize: 11, background: '#ef4444', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer' }} onClick={async () => {
                                 if (window.confirm('Dosyayı silmek istediğinize emin misiniz?')) {
                                   const updatedFiles = project.projectFiles.filter((_, idx) => idx !== i);
                                   await updateDoc(doc(db, 'projects', projectId), { projectFiles: updatedFiles });
@@ -799,25 +829,125 @@ export default function ProjectDetail() {
                   </div>
                 </div>
               </div>
+          )}
+        </div>
+      )}
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-                <div className="dashboard-card">
-                  <div className="dashboard-card-title">📅 ZAMAN ÇİZELGESİ</div>
-                  <div className="timeline-row">
-                    <div className="timeline-date">
-                      <span>Başlangıç</span>
-                      <span>{project.startDate || '-'}</span>
-                    </div>
-                    <span style={{ color: 'var(--text-muted)' }}>→</span>
-                    <div className="timeline-date" style={{ alignItems: 'flex-end' }}>
-                      <span>Hedef Bitiş</span>
-                      <span>{project.endDate || '-'}</span>
-                    </div>
+      {activeTab === 'schedule' && (
+        <div style={{ padding: '24px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+            <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 700 }}>📅 İş Programı</h2>
+            {isManager && (
+              <button className="btn-primary" style={{ padding: '8px 16px', fontSize: 13 }} onClick={() => {
+                const title = prompt('İş kalemi adı:');
+                if (!title) return;
+                const startDate = prompt('Başlangıç tarihi (YYYY-MM-DD):');
+                const endDate = prompt('Bitiş tarihi (YYYY-MM-DD):');
+                const assignee = prompt('Sorumlu kişi:');
+                if (!startDate || !endDate) return;
+                const newTask = { title, startDate, endDate, assignee: assignee || '', status: 'beklemede', id: Date.now().toString() };
+                const updatedSchedule = [...(project.schedule || []), newTask];
+                updateDoc(doc(db, 'projects', projectId), { schedule: updatedSchedule }).then(() => fetchProject());
+              }}>+ Yeni İş Kalemi</button>
+            )}
+          </div>
+
+          {/* Takvim Görünümü */}
+          {(() => {
+            const schedule = project.schedule || [];
+            if (schedule.length === 0) return <div className="empty-state">Henüz iş programı eklenmemiş.</div>;
+            
+            const allDates = schedule.flatMap(t => [new Date(t.startDate), new Date(t.endDate)]);
+            const minDate = new Date(Math.min(...allDates));
+            const maxDate = new Date(Math.max(...allDates));
+            const totalDays = Math.ceil((maxDate - minDate) / (1000 * 60 * 60 * 24)) + 1;
+            
+            const months = [];
+            let current = new Date(minDate);
+            while (current <= maxDate) {
+              const monthKey = `${current.getFullYear()}-${current.getMonth()}`;
+              if (!months.find(m => m.key === monthKey)) {
+                months.push({ key: monthKey, label: current.toLocaleDateString('tr-TR', { month: 'short', year: 'numeric' }), start: new Date(current) });
+              }
+              current.setDate(current.getDate() + 1);
+            }
+
+            const statusColors = { 'beklemede': '#94a3b8', 'devam ediyor': '#3b82f6', 'tamamlandı': '#22c55e', 'gecikmiş': '#ef4444' };
+
+            return (
+              <div style={{ background: 'var(--bg-card)', borderRadius: 12, border: '1px solid var(--border-color)', overflow: 'hidden' }}>
+                {/* Header - ay göstergesi */}
+                <div style={{ display: 'flex', borderBottom: '1px solid var(--border-color)', background: 'var(--bg-surface)', fontSize: 11, color: 'var(--text-muted)', fontWeight: 600 }}>
+                  <div style={{ width: 200, minWidth: 200, padding: '8px 12px', borderRight: '1px solid var(--border-color)' }}>İş Kalemi</div>
+                  <div style={{ flex: 1, display: 'flex', position: 'relative' }}>
+                    {months.map(m => {
+                      const monthStart = m.start;
+                      const offsetDays = Math.ceil((monthStart - minDate) / (1000 * 60 * 60 * 24));
+                      return <span key={m.key} style={{ position: 'absolute', left: `${(offsetDays / totalDays) * 100}%`, padding: '8px 6px', whiteSpace: 'nowrap' }}>{m.label}</span>;
+                    })}
                   </div>
                 </div>
+
+                {/* Görevler */}
+                {schedule.map((task, idx) => {
+                  const taskStart = new Date(task.startDate);
+                  const taskEnd = new Date(task.endDate);
+                  const startOffset = Math.ceil((taskStart - minDate) / (1000 * 60 * 60 * 24));
+                  const duration = Math.ceil((taskEnd - taskStart) / (1000 * 60 * 60 * 24)) + 1;
+                  const leftPercent = (startOffset / totalDays) * 100;
+                  const widthPercent = (duration / totalDays) * 100;
+                  const barColor = statusColors[task.status] || '#3b82f6';
+
+                  return (
+                    <div key={task.id || idx} style={{ display: 'flex', borderBottom: '1px solid var(--border-color)', minHeight: 44, alignItems: 'center' }}>
+                      <div style={{ width: 200, minWidth: 200, padding: '8px 12px', borderRight: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: 2 }}>
+                        <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-main)' }}>{task.title}</span>
+                        {task.assignee && <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{task.assignee}</span>}
+                      </div>
+                      <div style={{ flex: 1, position: 'relative', height: 28, margin: '0 8px' }}>
+                        <div 
+                          style={{ position: 'absolute', left: `${leftPercent}%`, width: `${Math.max(widthPercent, 1)}%`, height: '100%', background: barColor, borderRadius: 6, opacity: 0.85, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                          title={`${task.startDate} → ${task.endDate}`}
+                          onClick={() => {
+                            if (!isManager) return;
+                            const newStatus = prompt(`Durum değiştir (beklemede / devam ediyor / tamamlandı / gecikmiş):`, task.status);
+                            if (newStatus && ['beklemede', 'devam ediyor', 'tamamlandı', 'gecikmiş'].includes(newStatus)) {
+                              const updated = [...schedule];
+                              updated[idx] = { ...updated[idx], status: newStatus };
+                              updateDoc(doc(db, 'projects', projectId), { schedule: updated }).then(() => fetchProject());
+                            }
+                          }}
+                        >
+                          <span style={{ fontSize: 10, color: '#fff', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', padding: '0 6px' }}>{task.title}</span>
+                        </div>
+                      </div>
+                      {isManager && (
+                        <button 
+                          onClick={() => {
+                            if (window.confirm('Bu iş kalemini silmek istiyor musunuz?')) {
+                              const updated = schedule.filter((_, i) => i !== idx);
+                              updateDoc(doc(db, 'projects', projectId), { schedule: updated }).then(() => fetchProject());
+                            }
+                          }}
+                          style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '4px 8px', fontSize: 14, flexShrink: 0 }}
+                        >✕</button>
+                      )}
+                    </div>
+                  );
+                })}
+
+                {/* Durum göstergeleri */}
+                <div style={{ display: 'flex', gap: 16, padding: '10px 12px', borderTop: '1px solid var(--border-color)', flexWrap: 'wrap' }}>
+                  {Object.entries(statusColors).map(([s, c]) => (
+                    <div key={s} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--text-muted)' }}>
+                      <div style={{ width: 12, height: 12, borderRadius: 3, background: c }} />
+                      <span style={{ textTransform: 'capitalize' }}>{s}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
-            </div>
-          )}
+            );
+          })()}
         </div>
       )}
 

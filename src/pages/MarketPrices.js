@@ -88,30 +88,18 @@ export default function MarketPrices() {
               {lastUpdate && <span className="market-note">Son güncelleme: {lastUpdate.toLocaleTimeString('tr-TR')}</span>}
             </div>
             
-            <div className="rates-grid">
-              <div className="rate-card">
-                <div className="rate-top">
-                  <span className="rate-flag">🇺🇸</span>
-                  <span className="rate-code">USD</span>
-                </div>
-                <div className="rate-value">{rates.usd_try ? `₺${rates.usd_try.toFixed(2)}` : '—'}</div>
-                <div className="rate-label">Amerikan Doları</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', borderRadius: 8, background: 'var(--bg-card)', border: '1px solid var(--border-color)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}><span style={{ fontSize: 20 }}>🇺🇸</span><span style={{ fontSize: 14, fontWeight: 600 }}>USD / TRY</span></div>
+                <span style={{ fontSize: 16, fontWeight: 700, color: 'var(--primary-color)' }}>{rates.usd_try ? `₺${rates.usd_try.toFixed(2)}` : '—'}</span>
               </div>
-              <div className="rate-card">
-                <div className="rate-top">
-                  <span className="rate-flag">🇪🇺</span>
-                  <span className="rate-code">EUR</span>
-                </div>
-                <div className="rate-value">{rates.eur_try ? `₺${rates.eur_try.toFixed(2)}` : '—'}</div>
-                <div className="rate-label">Euro</div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', borderRadius: 8, background: 'var(--bg-card)', border: '1px solid var(--border-color)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}><span style={{ fontSize: 20 }}>🇪🇺</span><span style={{ fontSize: 14, fontWeight: 600 }}>EUR / TRY</span></div>
+                <span style={{ fontSize: 16, fontWeight: 700, color: 'var(--primary-color)' }}>{rates.eur_try ? `₺${rates.eur_try.toFixed(2)}` : '—'}</span>
               </div>
-              <div className="rate-card">
-                <div className="rate-top">
-                  <span className="rate-flag">💶</span>
-                  <span className="rate-code">EUR/USD</span>
-                </div>
-                <div className="rate-value">{rates.usd_eur ? `$${(1 / rates.usd_eur).toFixed(4)}` : '—'}</div>
-                <div className="rate-label">1 Euro kaç Dolar</div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', borderRadius: 8, background: 'var(--bg-card)', border: '1px solid var(--border-color)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}><span style={{ fontSize: 20 }}>💶</span><span style={{ fontSize: 14, fontWeight: 600 }}>EUR / USD</span></div>
+                <span style={{ fontSize: 16, fontWeight: 700, color: 'var(--primary-color)' }}>{rates.usd_eur ? `$${(1 / rates.usd_eur).toFixed(4)}` : '—'}</span>
               </div>
             </div>
           </div>
@@ -169,34 +157,26 @@ export default function MarketPrices() {
                 <div className="market-section-header">
                   <h2>{section.title}</h2>
                 </div>
-                <div className="materials-grid">
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                   {sectionMaterials.map(material => {
                     const data = materials[material.id];
-                    const price = data; // Backend doğrudan sayısal değer dönüyor
+                    const price = data;
                     return (
-                      <div key={material.id} className="material-card">
-                        <div className="material-header">
-                          <span className="material-emoji">{material.emoji}</span>
-                          <div>
-                            <div className="material-name">{material.name}</div>
-                            <div className="material-unit">/ {material.unit}</div>
-                          </div>
+                      <div key={material.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', borderRadius: 8, background: 'var(--bg-card)', border: '1px solid var(--border-color)', gap: 12 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1 }}>
+                          <span style={{ fontSize: 20 }}>{material.emoji}</span>
+                          <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-main)' }}>{material.name}</span>
+                          <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>/ {material.unit}</span>
                         </div>
-
-                        <div className="material-prices">
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexShrink: 0 }}>
                           {price ? (
                             <>
-                              <div className="price-try">₺{Number(price).toLocaleString('tr-TR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
-                              <div className="price-foreign">
-                                {toUSD(price) && <span className="price-usd">$ {toUSD(price)}</span>}
-                                {toEUR(price) && <span className="price-eur">€ {toEUR(price)}</span>}
-                              </div>
-                              <div className="price-by">
-                                🤖 {lastUpdate ? `Güncelleme: ${lastUpdate.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}` : 'Sistem (Canlı Kur)'}
-                              </div>
+                              <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--primary-color)' }}>₺{Number(price).toLocaleString('tr-TR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                              <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{toUSD(price) && `$ ${toUSD(price)}`}</span>
+                              <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{toEUR(price) && `€ ${toEUR(price)}`}</span>
                             </>
                           ) : (
-                            <div className="price-empty">Fiyat alınamadı</div>
+                            <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>—</span>
                           )}
                         </div>
                       </div>
