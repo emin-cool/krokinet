@@ -86,55 +86,55 @@ export default function Profile() {
         </div>
       </div>
 
-      <div style={{ flex: 1, padding: 24, display: 'flex', justifyContent: 'center' }}>
-        <div style={{ background: '#1e293b', padding: 32, borderRadius: 12, width: '100%', maxWidth: 500, height: 'fit-content', border: '1px solid #334155' }}>
-          <h2 style={{ color: '#fff', marginBottom: 24 }}>Profil Ayarları</h2>
+      <div style={{ flex: 1, padding: 32, display: 'flex', justifyContent: 'center' }}>
+        <div style={{ background: 'var(--bg-card)', padding: 36, borderRadius: 16, width: '100%', maxWidth: 500, height: 'fit-content', border: '1px solid var(--border-color)', boxShadow: 'var(--shadow-md)' }}>
+          <h2 style={{ color: 'var(--text-main)', marginBottom: 28 }}>Profil Ayarları</h2>
           
-          {message && <div style={{ background: 'rgba(34, 197, 94, 0.2)', color: '#4ade80', padding: 12, borderRadius: 6, marginBottom: 16 }}>{message}</div>}
-          {error && <div style={{ background: 'rgba(239, 68, 68, 0.2)', color: '#f87171', padding: 12, borderRadius: 6, marginBottom: 16 }}>{error}</div>}
+          {message && <div style={{ background: 'rgba(34, 197, 94, 0.1)', color: '#22c55e', padding: 14, borderRadius: 10, marginBottom: 16, fontSize: '0.875rem', fontWeight: 600 }}>{message}</div>}
+          {error && <div style={{ background: 'rgba(239, 68, 68, 0.1)', color: '#f87171', padding: 14, borderRadius: 10, marginBottom: 16, fontSize: '0.875rem', fontWeight: 600 }}>{error}</div>}
           
-          <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
             <div>
-              <label style={{ display: 'block', color: '#94a3b8', marginBottom: 8, fontSize: 13 }}>Ad Soyad</label>
+              <label style={{ display: 'block', color: 'var(--text-muted)', marginBottom: 8, fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Ad Soyad</label>
               <input 
                 type="text" 
                 value={name} 
                 onChange={e => setName(e.target.value)} 
-                style={{ width: '100%', padding: '10px 12px', borderRadius: 6, border: '1px solid #334155', background: '#0f172a', color: '#fff' }}
+                style={{ width: '100%', padding: '14px 18px', borderRadius: 10, border: '1.5px solid var(--border-color)', background: 'var(--bg-card-hover)', color: 'var(--text-main)', fontSize: '0.9375rem', outline: 'none', fontFamily: 'inherit' }}
               />
             </div>
 
             <div>
-              <label style={{ display: 'block', color: '#94a3b8', marginBottom: 8, fontSize: 13 }}>Unvan / Rol</label>
+              <label style={{ display: 'block', color: 'var(--text-muted)', marginBottom: 8, fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Unvan / Rol</label>
               <input 
                 type="text" 
                 value={userData?.role || ''} 
                 disabled
-                style={{ width: '100%', padding: '10px 12px', borderRadius: 6, border: '1px solid #334155', background: '#0f172a', color: '#64748b', cursor: 'not-allowed' }}
+                style={{ width: '100%', padding: '14px 18px', borderRadius: 10, border: '1.5px solid var(--border-color)', background: 'var(--bg-card-hover)', color: 'var(--text-muted)', cursor: 'not-allowed', fontSize: '0.9375rem', fontFamily: 'inherit' }}
               />
-              <small style={{ color: '#64748b', fontSize: 11, marginTop: 4, display: 'block' }}>Unvanınızı proje yöneticileri değiştirebilir.</small>
+              <small style={{ color: 'var(--text-muted)', fontSize: '0.6875rem', marginTop: 6, display: 'block' }}>Unvanınızı proje yöneticileri değiştirebilir.</small>
             </div>
 
-            <hr style={{ border: 'none', borderTop: '1px solid #334155', margin: '8px 0' }} />
+            <hr style={{ border: 'none', borderTop: '1px solid var(--border-color)', margin: '4px 0' }} />
 
             <div>
-              <label style={{ display: 'block', color: '#94a3b8', marginBottom: 8, fontSize: 13 }}>Yeni Şifre (Değiştirmek istemiyorsanız boş bırakın)</label>
+              <label style={{ display: 'block', color: 'var(--text-muted)', marginBottom: 8, fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Yeni Şifre (Değiştirmek istemiyorsanız boş bırakın)</label>
               <input 
                 type="password" 
                 value={password} 
                 onChange={e => setPassword(e.target.value)} 
                 placeholder="En az 6 karakter"
-                style={{ width: '100%', padding: '10px 12px', borderRadius: 6, border: '1px solid #334155', background: '#0f172a', color: '#fff' }}
+                style={{ width: '100%', padding: '14px 18px', borderRadius: 10, border: '1.5px solid var(--border-color)', background: 'var(--bg-card-hover)', color: 'var(--text-main)', fontSize: '0.9375rem', fontFamily: 'inherit' }}
               />
             </div>
 
             <div>
-              <label style={{ display: 'block', color: '#94a3b8', marginBottom: 8, fontSize: 13 }}>Yeni Şifre Tekrar</label>
+              <label style={{ display: 'block', color: 'var(--text-muted)', marginBottom: 8, fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Yeni Şifre Tekrar</label>
               <input 
                 type="password" 
                 value={confirmPassword} 
                 onChange={e => setConfirmPassword(e.target.value)} 
-                style={{ width: '100%', padding: '10px 12px', borderRadius: 6, border: '1px solid #334155', background: '#0f172a', color: '#fff' }}
+                style={{ width: '100%', padding: '14px 18px', borderRadius: 10, border: '1.5px solid var(--border-color)', background: 'var(--bg-card-hover)', color: 'var(--text-main)', fontSize: '0.9375rem', fontFamily: 'inherit' }}
               />
             </div>
 
@@ -142,7 +142,7 @@ export default function Profile() {
               type="submit" 
               className="btn-primary" 
               disabled={loading}
-              style={{ marginTop: 16, padding: '12px', fontSize: 15 }}
+              style={{ marginTop: 8, padding: '14px', fontSize: '0.9375rem' }}
             >
               {loading ? 'Kaydediliyor...' : 'Değişiklikleri Kaydet'}
             </button>

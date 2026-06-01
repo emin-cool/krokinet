@@ -38,19 +38,20 @@ function ThemeToggle() {
         position: 'fixed',
         bottom: 20,
         right: 20,
-        background: 'var(--primary-color)',
+        background: 'var(--primary-gradient)',
         color: '#fff',
         border: 'none',
         borderRadius: '50%',
-        width: 50,
-        height: 50,
-        fontSize: 24,
+        width: 48,
+        height: 48,
+        fontSize: 22,
         cursor: 'pointer',
-        boxShadow: '0 4px 10px rgba(0,0,0,0.3)',
+        boxShadow: '0 4px 16px rgba(99, 102, 241, 0.35)',
         zIndex: 9999,
         display: 'flex',
         alignItems: 'center',
-        justifyContent: 'center'
+        justifyContent: 'center',
+        transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)'
       }}
       title="Temayı Değiştir"
     >
