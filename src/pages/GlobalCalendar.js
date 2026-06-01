@@ -24,6 +24,7 @@ export default function GlobalCalendar() {
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('calendar'); // 'calendar' or 'gantt'
+  const [categoryFilter, setCategoryFilter] = useState('Tümü'); // 'Tümü', 'Mimari', 'Mekanik', 'Elektrik', 'Kaba İnşaat', 'İnce İşler', 'Genel'
   
   // Modal states
   const [showModal, setShowModal] = useState(false);
@@ -36,6 +37,7 @@ export default function GlobalCalendar() {
     endTime: '10:00',
     color: '#3b82f6',
     description: '',
+    category: 'Genel',
     dependencies: '' // ID of the task it depends on
   });
 
@@ -50,6 +52,7 @@ export default function GlobalCalendar() {
           end: data.end ? new Date(data.end.toDate ? data.end.toDate() : data.end) : new Date(),
           color: data.color || '#3b82f6',
           description: data.description || '',
+          category: data.category || 'Genel',
           createdBy: data.createdBy,
           dependencies: data.dependencies || '',
           progress: data.progress || 0,
@@ -66,9 +69,11 @@ export default function GlobalCalendar() {
   const today = new Date();
   today.setHours(0,0,0,0);
 
-  const upcomingTasks = events.filter(e => e.start >= today && e.start <= new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000)).sort((a,b) => a.start - b.start);
-  const delayedTasks = events.filter(e => e.end < today && e.progress < 100).sort((a,b) => b.end - a.end);
-  const todayTasks = events.filter(e => e.start <= today && e.end >= today);
+  const displayedEvents = categoryFilter === 'Tümü' ? events : events.filter(e => e.category === categoryFilter);
+
+  const upcomingTasks = displayedEvents.filter(e => e.start >= today && e.start <= new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000)).sort((a,b) => a.start - b.start);
+  const delayedTasks = displayedEvents.filter(e => e.end < today && e.progress < 100).sort((a,b) => b.end - a.end);
+  const todayTasks = displayedEvents.filter(e => e.start <= today && e.end >= today);
 
   // --- PDF Export ---
   const downloadPDF = () => {
@@ -79,8 +84,9 @@ export default function GlobalCalendar() {
     doc.setFontSize(11);
     doc.text(`Tarih: ${moment().format('DD MMMM YYYY')}`, 14, 30);
 
-    const tableData = events.sort((a,b) => a.start - b.start).map(e => [
+    const tableData = displayedEvents.sort((a,b) => a.start - b.start).map(e => [
       e.title,
+      e.category,
       moment(e.start).format('DD MMM YYYY HH:mm'),
       moment(e.end).format('DD MMM YYYY HH:mm'),
       e.dependencies ? events.find(ev => ev.id === e.dependencies)?.title || '-' : '-',
@@ -89,7 +95,7 @@ export default function GlobalCalendar() {
 
     autoTable(doc, {
       startY: 40,
-      head: [['Is Kalemi', 'Baslangic', 'Bitis', 'Oncul Is', 'Durum']],
+      head: [['Is Kalemi', 'Kategori', 'Baslangic', 'Bitis', 'Oncul Is', 'Durum']],
       body: tableData,
       theme: 'grid',
       styles: { fontSize: 10 },
@@ -158,7 +164,7 @@ export default function GlobalCalendar() {
   };
   
   // --- Gantt Chart Tasks ---
-  const ganttTasks = events.map(e => ({
+  const ganttTasks = displayedEvents.map(e => ({
     start: e.start,
     end: e.end,
     name: e.title,
@@ -198,7 +204,7 @@ export default function GlobalCalendar() {
     setFormData({
       title: '', startDate, startTime,
       endDate: moment(end).isSame(start, 'day') ? endDate : moment(end).subtract(1, 'days').format('YYYY-MM-DD'),
-      endTime, color: '#3b82f6', description: '', dependencies: ''
+      endTime, color: '#3b82f6', description: '', category: 'Genel', dependencies: ''
     });
     setShowModal(true);
   };
@@ -214,6 +220,7 @@ export default function GlobalCalendar() {
       endTime: moment(event.end).format('HH:mm'),
       color: event.color || event.styles?.progressColor || '#3b82f6',
       description: event.description || '',
+      category: event.category || 'Genel',
       dependencies: event.dependencies && event.dependencies.length > 0 ? (Array.isArray(event.dependencies) ? event.dependencies[0] : event.dependencies) : ''
     });
     setShowModal(true);
@@ -239,6 +246,7 @@ export default function GlobalCalendar() {
       end: endDateTime.toISOString(),
       color: formData.color,
       description: formData.description,
+      category: formData.category,
       dependencies: formData.dependencies,
       createdBy: currentUser.uid,
       updatedAt: new Date().toISOString()
@@ -295,39 +303,64 @@ export default function GlobalCalendar() {
   return (
     <div style={{ padding: '24px', background: 'var(--bg-main)', minHeight: 'calc(100vh - 120px)' }}>
       {/* HEADER */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-        <div>
-          <h1 style={{ fontSize: '28px', fontWeight: 800, margin: 0, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <CalendarDays size={32} color="var(--primary-color)"/> İş Programı & Gantt
-          </h1>
-          <p style={{ color: 'var(--text-muted)', fontSize: '14px', marginTop: '8px' }}>Genel şantiye takvimi ve proje çizelgesi.</p>
-        </div>
-        
-        <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-          <button className="btn-secondary" onClick={downloadPDF} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 16px' }}>
-            <Download size={18} /> Rapor İndir
-          </button>
-          
-          <div style={{ display: 'flex', background: 'var(--bg-card)', borderRadius: '8px', padding: '4px', border: '1px solid var(--border-color)' }}>
-            <button 
-              onClick={() => setActiveTab('calendar')}
-              style={{ padding: '8px 16px', borderRadius: '6px', border: 'none', background: activeTab === 'calendar' ? 'var(--primary-color)' : 'transparent', color: activeTab === 'calendar' ? '#fff' : 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 600, transition: 'all 0.2s' }}
-            >
-              <LayoutGrid size={18} /> Takvim
-            </button>
-            <button 
-              onClick={() => setActiveTab('gantt')}
-              style={{ padding: '8px 16px', borderRadius: '6px', border: 'none', background: activeTab === 'gantt' ? 'var(--primary-color)' : 'transparent', color: activeTab === 'gantt' ? '#fff' : 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 600, transition: 'all 0.2s' }}
-            >
-              <BarChartHorizontal size={18} /> Gantt
-            </button>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', marginBottom: 24 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <h1 style={{ fontSize: '28px', fontWeight: 800, margin: 0, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <CalendarDays size={32} color="var(--primary-color)"/> Proje Programı & Gantt
+            </h1>
+            <p style={{ color: 'var(--text-muted)', fontSize: '14px', marginTop: '8px' }}>Genel şantiye takvimi ve proje görevleri.</p>
           </div>
           
-          {userData?.isSuperAdmin && (
-            <button className="btn-primary" onClick={() => handleSelectSlot({ start: new Date(), end: new Date() })} style={{ padding: '10px 16px' }}>
-              ➕ Yeni İş
+          <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+            <button className="btn-secondary" onClick={downloadPDF} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 16px' }}>
+              <Download size={18} /> Rapor İndir
             </button>
-          )}
+            
+            <div style={{ display: 'flex', background: 'var(--bg-card)', borderRadius: '8px', padding: '4px', border: '1px solid var(--border-color)' }}>
+              <button 
+                onClick={() => setActiveTab('calendar')}
+                style={{ padding: '8px 16px', borderRadius: '6px', border: 'none', background: activeTab === 'calendar' ? 'var(--primary-color)' : 'transparent', color: activeTab === 'calendar' ? '#fff' : 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 600, transition: 'all 0.2s' }}
+              >
+                <LayoutGrid size={18} /> Takvim
+              </button>
+              <button 
+                onClick={() => setActiveTab('gantt')}
+                style={{ padding: '8px 16px', borderRadius: '6px', border: 'none', background: activeTab === 'gantt' ? 'var(--primary-color)' : 'transparent', color: activeTab === 'gantt' ? '#fff' : 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 600, transition: 'all 0.2s' }}
+              >
+                <BarChartHorizontal size={18} /> Gantt
+              </button>
+            </div>
+            
+            {userData?.isSuperAdmin && (
+              <button className="btn-primary" onClick={() => handleSelectSlot({ start: new Date(), end: new Date() })} style={{ padding: '10px 16px' }}>
+                ➕ Yeni İş
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Kategori Filtreleri */}
+        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+          {['Tümü', 'Genel', 'Mimari', 'Mekanik', 'Elektrik', 'Kaba İnşaat', 'İnce İşler'].map(cat => (
+            <button
+              key={cat}
+              onClick={() => setCategoryFilter(cat)}
+              style={{
+                padding: '8px 16px',
+                borderRadius: '20px',
+                border: categoryFilter === cat ? '2px solid var(--primary-color)' : '1px solid var(--border-color)',
+                background: categoryFilter === cat ? 'var(--primary-color)' : 'var(--bg-card)',
+                color: categoryFilter === cat ? '#fff' : 'var(--text-main)',
+                fontSize: '13px',
+                fontWeight: 600,
+                cursor: 'pointer',
+                transition: 'all 0.2s'
+              }}
+            >
+              {cat}
+            </button>
+          ))}
         </div>
       </div>
 
@@ -340,7 +373,7 @@ export default function GlobalCalendar() {
           {activeTab === 'calendar' ? (
             <DnDCalendar
               localizer={localizer}
-              events={events}
+              events={displayedEvents}
               startAccessor="start"
               endAccessor="end"
               style={{ height: '100%', color: 'var(--text-main)' }}
@@ -462,6 +495,22 @@ export default function GlobalCalendar() {
                     <input type="time" value={formData.endTime} onChange={e => setFormData({...formData, endTime: e.target.value})} style={{ flex: 1 }}/>
                   </div>
                 </div>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: 13, marginBottom: 4, color: 'var(--text-muted)' }}>İşin Kategorisi</label>
+                <select 
+                  value={formData.category} 
+                  onChange={e => setFormData({...formData, category: e.target.value})}
+                  style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-secondary)', color: 'var(--text-main)' }}
+                >
+                  <option value="Genel">Genel</option>
+                  <option value="Mimari">Mimari</option>
+                  <option value="Mekanik">Mekanik</option>
+                  <option value="Elektrik">Elektrik</option>
+                  <option value="Kaba İnşaat">Kaba İnşaat</option>
+                  <option value="İnce İşler">İnce İşler</option>
+                </select>
               </div>
 
               <div>
