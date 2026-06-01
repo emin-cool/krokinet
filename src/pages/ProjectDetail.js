@@ -56,6 +56,7 @@ export default function ProjectDetail() {
   const [projectInfo, setProjectInfo] = useState({});
   const [editingFloorIndex, setEditingFloorIndex] = useState(null);
   const [editingFloorName, setEditingFloorName] = useState('');
+  const [mapRotation, setMapRotation] = useState(0);
 
   useEffect(() => {
     fetchProject();
@@ -533,6 +534,7 @@ export default function ProjectDetail() {
                       <button className="zoom-btn" onClick={() => zoomIn()}>+</button>
                       <button className="zoom-btn" onClick={() => zoomOut()}>-</button>
                       <button className="zoom-btn" onClick={() => resetTransform()}>⟲</button>
+                      <button className="zoom-btn" onClick={() => setMapRotation(prev => (prev + 90) % 360)} title="Döndür">↻</button>
                     </div>
                     <TransformComponent wrapperStyle={{ width: "100%", height: "70vh", backgroundColor: "var(--bg-main)", cursor: (addingPin && !newPinCoords) ? 'crosshair' : 'grab' }}>
                       <div
@@ -544,7 +546,7 @@ export default function ProjectDetail() {
                         onTouchMove={handlePointerMove}
                         onTouchEnd={handlePointerUp}
                         ref={imageRef}
-                        style={{ position: 'relative', display: 'flex', justifyContent: 'center', alignItems: 'center', width: '100%', height: '100%' }}
+                        style={{ position: 'relative', display: 'flex', justifyContent: 'center', alignItems: 'center', width: '100%', height: '100%', transform: `rotate(${mapRotation}deg)`, transition: 'transform 0.3s ease' }}
                       >
                         <img src={floorPlans[activeFloor]?.imageUrl} alt="Kat Planı" draggable={false} style={{ display: 'block', maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
                         {currentFloorPins.map(pin => {
@@ -563,7 +565,8 @@ export default function ProjectDetail() {
                                 cursor: movingPinId === pin.id ? (isDragging ? 'grabbing' : 'grab') : 'pointer',
                                 zIndex: isDragging ? 1000 : 10,
                                 animation: movingPinId === pin.id && !isDragging ? 'pulse 1s infinite' : 'none',
-                                boxShadow: movingPinId === pin.id ? '0 0 0 4px rgba(59,130,246,0.6)' : undefined
+                                boxShadow: movingPinId === pin.id ? '0 0 0 4px rgba(59,130,246,0.6)' : undefined,
+                                transform: `translate(-50%, -100%) rotate(${-45 - mapRotation}deg)`
                               }}
                               onMouseDown={e => handlePinPointerDown(e, pin)}
                               onTouchStart={e => handlePinPointerDown(e, pin)}
@@ -593,7 +596,7 @@ export default function ProjectDetail() {
                           );
                         })}
                         {newPinCoords && (
-                          <div className="pin-marker-custom" style={{ left: `${newPinCoords.x}%`, top: `${newPinCoords.y}%`, background: newPinData.color }}>
+                          <div className="pin-marker-custom" style={{ left: `${newPinCoords.x}%`, top: `${newPinCoords.y}%`, background: newPinData.color, transform: `translate(-50%, -100%) rotate(${-45 - mapRotation}deg)` }}>
                             <div className="pin-tooltip">Yeni Pin</div>
                           </div>
                         )}
