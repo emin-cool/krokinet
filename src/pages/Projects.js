@@ -67,12 +67,12 @@ export default function Projects() {
         <div className="header-actions">
           <NotificationsDropdown />
           {userData?.isSuperAdmin && activeSection === 'projects' && (
-            <button className="btn-primary" onClick={() => setShowNewProject(true)}>
+            <button className="btn-primary desktop-new-project-btn hide-on-mobile" onClick={() => setShowNewProject(true)}>
               <Plus size={16} style={{ marginRight: '6px' }} /> Yeni Proje
             </button>
           )}
-          <button className="btn-secondary" onClick={() => navigate('/profile')} style={{ marginRight: 8 }}>Profilim</button>
-          <button className="btn-secondary" onClick={() => signOut(auth)}>Çıkış</button>
+          <button className="btn-secondary hide-on-mobile" onClick={() => navigate('/profile')} style={{ marginRight: 8 }}>Profilim</button>
+          <button className="btn-secondary hide-on-mobile" onClick={() => signOut(auth)}>Çıkış</button>
         </div>
       </div>
 
@@ -147,7 +147,7 @@ export default function Projects() {
                           fetchProjects();
                         }
                       }}
-                      style={{ position: 'absolute', top: 12, right: 12, padding: '4px 8px', borderRadius: 6, border: 'none', background: 'var(--bg-card-hover)', cursor: 'pointer', fontSize: 12 }}
+                      style={{ position: 'absolute', top: 16, right: 16, padding: '6px 10px', borderRadius: 8, border: 'none', background: 'var(--bg-card-hover)', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 12, fontWeight: 600, transition: 'var(--transition-fast)' }}
                     >
                       {projectTab === 'active' ? 'Arşivle' : 'Geri Al'}
                     </button>
@@ -156,13 +156,15 @@ export default function Projects() {
                   <div className="project-icon" style={{ background: project.isArchived ? '#f3f4f6' : 'rgba(59, 130, 246, 0.1)' }}>
                     <Building2 size={28} color={project.isArchived ? '#9ca3af' : 'var(--primary-color)'} />
                   </div>
-                  <h3>{project.name}</h3>
-                  <p>{project.description}</p>
-                  {project.address && (
-                    <span className="project-address" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                      <MapPin size={14} /> {project.address}
-                    </span>
-                  )}
+                  <div className="project-card-content" style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+                    <h3 style={{ margin: 0, marginBottom: '6px' }}>{project.name}</h3>
+                    {project.description && <p style={{ margin: 0, marginBottom: '8px' }}>{project.description}</p>}
+                    {project.address && (
+                      <span className="project-address" style={{ display: 'flex', alignItems: 'center', gap: '4px', margin: 0 }}>
+                        <MapPin size={14} /> {project.address}
+                      </span>
+                    )}
+                  </div>
                 </div>
               ))
             )}

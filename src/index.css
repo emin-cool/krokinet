@@ -2135,6 +2135,9 @@ p {
    RESPONSIVE — Desktop first
    ═══════════════════════════════════════════════════════ */
 @media (max-width: 768px) {
+  .hide-on-mobile {
+    display: none !important;
+  }
   .projects-header {
     flex-direction: column;
     align-items: flex-start;
@@ -2145,6 +2148,36 @@ p {
   .projects-tabs, .detail-tabs {
     padding: 0 20px;
   }
+  
+  .projects-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  
+  /* Make project cards look like rows on mobile */
+  .project-card {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    padding: 16px;
+    gap: 16px;
+    margin-bottom: 8px; /* So there's vertical spacing if no grid gap applied properly on mobile */
+  }
+  .project-card .project-icon {
+    width: 48px;
+    height: 48px;
+    font-size: 24px;
+    margin-bottom: 0;
+    flex-shrink: 0;
+  }
+  .project-card-content {
+    align-items: flex-start;
+  }
+  .project-card h3 {
+    font-size: 1.05rem;
+  }
+
   .plan-view {
     padding: 20px;
   }
