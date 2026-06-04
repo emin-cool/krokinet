@@ -69,22 +69,22 @@ export default function NotificationsDropdown() {
 
       {isOpen && (
         <div style={{ 
-          position: 'absolute', top: 40, right: 0, width: 320, background: '#1e293b', 
-          border: '1px solid #334155', borderRadius: 8, boxShadow: '0 10px 25px rgba(0,0,0,0.5)', zIndex: 999 
+          position: 'absolute', top: 40, right: 0, width: 320, background: 'var(--bg-card)', 
+          border: '1px solid var(--border-color)', borderRadius: 8, boxShadow: '0 10px 25px rgba(0,0,0,0.5)', zIndex: 999 
         }}>
-          <div style={{ padding: '12px 16px', borderBottom: '1px solid #334155', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <h4 style={{ margin: 0, color: '#fff', fontSize: 15 }}>Bildirimler</h4>
+          <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <h4 style={{ margin: 0, color: 'var(--text-main)', fontSize: 15 }}>Bildirimler</h4>
           </div>
           <div style={{ maxHeight: 350, overflowY: 'auto' }}>
             {notifications.length === 0 ? (
-              <div style={{ padding: 20, textAlign: 'center', color: '#94a3b8', fontSize: 13 }}>Hiç bildiriminiz yok.</div>
+              <div style={{ padding: 20, textAlign: 'center', color: 'var(--text-secondary)', fontSize: 13 }}>Hiç bildiriminiz yok.</div>
             ) : (
               notifications.map(notif => (
                 <div 
                   key={notif.id} 
                   onClick={() => markAsReadAndNavigate(notif)}
                   style={{ 
-                    padding: '12px 16px', borderBottom: '1px solid #334155', cursor: 'pointer',
+                    padding: '12px 16px', borderBottom: '1px solid var(--border-color)', cursor: 'pointer',
                     background: notif.read ? 'transparent' : 'rgba(59, 130, 246, 0.1)'
                   }}
                 >
@@ -93,10 +93,10 @@ export default function NotificationsDropdown() {
                       {notif.type === 'mention' ? <MessageSquare size={18} /> : <MapPin size={18} />}
                     </div>
                     <div>
-                      <div style={{ fontSize: 13, color: notif.read ? '#cbd5e1' : '#fff', fontWeight: notif.read ? 'normal' : 'bold' }}>
+                      <div style={{ fontSize: 13, color: notif.read ? 'var(--text-main)' : 'var(--text-main)', fontWeight: notif.read ? 'normal' : 'bold' }}>
                         {notif.message}
                       </div>
-                      <div style={{ fontSize: 11, color: '#64748b', marginTop: 4 }}>
+                      <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
                         {notif.createdAt?.toDate ? notif.createdAt.toDate().toLocaleString('tr-TR') : ''}
                       </div>
                     </div>
@@ -105,6 +105,7 @@ export default function NotificationsDropdown() {
               ))
             )}
           </div>
+          <div style={{textAlign:'center',padding:'8px'}}><a href='/notifications' style={{color:'var(--primary-color)',fontSize:12,textDecoration:'none'}}>Tümünü Gör →</a></div>
         </div>
       )}
     </div>

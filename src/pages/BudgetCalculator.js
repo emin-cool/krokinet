@@ -2,25 +2,28 @@
 import React, { useState, useEffect } from 'react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { MATERIALS } from '../utils/constants';
+import { MATERIALS, generateUniqueId } from '../utils/constants';
 
 export default function BudgetCalculator() {
   const [livePrices, setLivePrices] = useState(null);
   const [budgetItems, setBudgetItems] = useState([]);
   const [newBudgetItem, setNewBudgetItem] = useState({ materialId: MATERIALS[0].id, quantity: 1 });
   const [reportName, setReportName] = useState('Genel Keşif Raporu');
+  const [apiError, setApiError] = useState(false);
 
   useEffect(() => {
     fetch(`${process.env.REACT_APP_API_URL}/api/market-prices/refresh`, { method: 'POST' })
       .then(res => res.json())
       .then(data => setLivePrices(data.data.materials))
-      .catch(err => console.error("Fiyatlar çekilemedi", err));
+      .catch(err => { console.error("Fiyatlar çekilemedi", err); setApiError(true); });
   }, []);
 
   function addBudgetItem() {
     if (!newBudgetItem.quantity || newBudgetItem.quantity <= 0) return;
+    const qty = Number(newBudgetItem.quantity);
+    if (isNaN(qty) || qty <= 0) { alert('Geçerli bir miktar giriniz.'); return; }
     const material = MATERIALS.find(m => m.id === newBudgetItem.materialId);
-    const newItem = { id: Date.now().toString(), materialId: material.id, name: material.name, unit: material.unit, quantity: Number(newBudgetItem.quantity) };
+    const newItem = { id: generateUniqueId(), materialId: material.id, name: material.name, unit: material.unit, quantity: qty };
     setBudgetItems([...budgetItems, newItem]);
     setNewBudgetItem({ materialId: MATERIALS[0].id, quantity: 1 });
   }
@@ -40,7 +43,7 @@ export default function BudgetCalculator() {
     let grandTotal = 0;
 
     budgetItems.forEach(item => {
-      const price = livePrices ? livePrices[item.materialId] : 0;
+      const price = (livePrices && livePrices[item.materialId]) || 0;
       const total = price * item.quantity;
       grandTotal += total;
       tableRows.push([
@@ -58,7 +61,7 @@ export default function BudgetCalculator() {
       body: tableRows,
       startY: 30,
     });
-    doc.save(`${reportName.replace(/\\s+/g, '_')}.pdf`);
+    doc.save(`${reportName.replace(/\s+/g, '_')}.pdf`);
   }
 
   return (
@@ -78,7 +81,10 @@ export default function BudgetCalculator() {
         <button className="btn-primary" onClick={exportPDF} disabled={!livePrices || budgetItems.length === 0}>📄 PDF Olarak İndir</button>
       </div>
 
-      {!livePrices ? (
+      {apiError && (
+        <div style={{ background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', padding: '14px', borderRadius: '10px', marginBottom: '16px', fontSize: '14px', fontWeight: 600 }}>Fiyat verileri yüklenirken bir hata oluştu. Lütfen sayfayı yenileyiniz.</div>
+      )}
+      {!livePrices && !apiError ? (
         <div className="loading">Canlı piyasa fiyatları yükleniyor...</div>
       ) : (
         <>

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../firebase';
-import { collection, query, where, orderBy, onSnapshot, doc, updateDoc, deleteDoc, limit } from 'firebase/firestore';
+import { collection, query, where, orderBy, onSnapshot, doc, updateDoc, deleteDoc, limit, writeBatch } from 'firebase/firestore';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { MessageSquare, MapPin, Check, ArrowLeft } from 'lucide-react';
@@ -36,10 +36,9 @@ export default function NotificationsPage() {
   };
 
   const markAllAsRead = async () => {
-    const unreadNotifs = notifications.filter(n => !n.read);
-    for (const notif of unreadNotifs) {
-      await updateDoc(doc(db, 'notifications', notif.id), { read: true });
-    }
+    const batch = writeBatch(db);
+    notifications.filter(n => !n.read).forEach(n => batch.update(doc(db, 'notifications', n.id), { read: true }));
+    await batch.commit();
   };
 
   const deleteNotification = async (id) => {

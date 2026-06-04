@@ -11,18 +11,38 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [failedAttempts, setFailedAttempts] = useState(0);
+  const [lockoutSeconds, setLockoutSeconds] = useState(0);
   const navigate = useNavigate();
+
+  React.useEffect(() => {
+    if (lockoutSeconds <= 0) return;
+    const timer = setTimeout(() => setLockoutSeconds(s => s - 1), 1000);
+    return () => clearTimeout(timer);
+  }, [lockoutSeconds]);
+
+  const isLockedOut = lockoutSeconds > 0;
 
   async function handleSubmit(e) {
     e.preventDefault();
+    if (isLockedOut) return;
     setError('');
     setLoading(true);
     try {
       const emailAddress = username.includes('@') ? username : `${username.toLowerCase().replace(/\s+/g, '')}@insaat-app.com`;
       await signInWithEmailAndPassword(auth, emailAddress, password);
+      setFailedAttempts(0);
       navigate('/');
     } catch {
-      setError('Kullanıcı adı veya şifre hatalı.');
+      const newCount = failedAttempts + 1;
+      setFailedAttempts(newCount);
+      if (newCount >= 3) {
+        setLockoutSeconds(30);
+        setFailedAttempts(0);
+        setError('Çok fazla başarısız deneme. Lütfen 30 saniye bekleyin.');
+      } else {
+        setError('Kullanıcı adı veya şifre hatalı.');
+      }
     }
     setLoading(false);
   }
@@ -38,6 +58,7 @@ export default function Login() {
         </div>
         <p>Hesabınıza giriş yapın</p>
         {error && <div className="error-msg">{error}</div>}
+        {isLockedOut && <div className="error-msg">{lockoutSeconds} saniye sonra tekrar deneyebilirsiniz.</div>}
         <form onSubmit={handleSubmit}>
           <input
             placeholder="Kullanıcı Adı"
@@ -52,8 +73,8 @@ export default function Login() {
             onChange={e => setPassword(e.target.value)}
             required
           />
-          <button type="submit" disabled={loading}>
-            {loading ? 'Giriş yapılıyor...' : 'Giriş Yap'}
+          <button type="submit" disabled={loading || isLockedOut}>
+            {isLockedOut ? `Kilitlendi (${lockoutSeconds}s)` : loading ? 'Giriş yapılıyor...' : 'Giriş Yap'}
           </button>
         </form>
       </div>

@@ -1,16 +1,21 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Basic function to check if logged in
     function isSignedIn() {
       return request.auth != null;
     }
 
+    function isSuperAdmin() {
+      return isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isSuperAdmin == true;
+    }
+
     match /users/{userId} {
-      // Any signed in user can read the user list
       allow read: if isSignedIn();
-      // Only the user themselves or a superAdmin can edit their profile (Simplified for MVP)
-      allow write: if isSignedIn(); 
+      allow create: if isSignedIn() && !request.resource.data.isSuperAdmin;
+      allow update: if isSignedIn() &&
+        (request.auth.uid == userId || isSuperAdmin()) &&
+        (request.auth.uid != userId || !request.resource.data.diff(resource.data).affectedKeys().hasAny(['isSuperAdmin']));
+      allow delete: if isSuperAdmin();
     }
 
     match /groups/{groupId} {
@@ -19,30 +24,37 @@ service cloud.firestore {
     }
 
     match /projects/{projectId} {
-      // Anyone can read if they are in memberIds, or if they just need to list it
-      // For MVP, we'll allow any signed-in user to read so Dashboard populates, 
-      // but you can restrict it in production to: `if isSignedIn() && request.auth.uid in resource.data.memberIds`
       allow read: if isSignedIn();
-      allow write: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update: if isSignedIn() && (request.auth.uid in resource.data.memberIds || isSuperAdmin());
+      allow delete: if isSignedIn() && (resource.data.managerId == request.auth.uid || isSuperAdmin());
     }
 
     match /pins/{pinId} {
-      allow read, write: if isSignedIn();
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update, delete: if isSignedIn() &&
+        (request.auth.uid in get(/databases/$(database)/documents/projects/$(resource.data.projectId)).data.memberIds || isSuperAdmin());
     }
 
     match /messages/{messageId} {
-      allow read, write: if isSignedIn();
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update, delete: if isSignedIn() &&
+        (request.auth.uid in get(/databases/$(database)/documents/projects/$(resource.data.projectId)).data.memberIds || isSuperAdmin());
     }
 
     match /files/{fileId} {
-      allow read, write: if isSignedIn();
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update, delete: if isSignedIn() &&
+        (request.auth.uid in get(/databases/$(database)/documents/projects/$(resource.data.projectId)).data.memberIds || isSuperAdmin());
     }
 
     match /notifications/{notificationId} {
-      // Users can only read their own notifications
       allow read: if isSignedIn() && resource.data.userId == request.auth.uid;
-      // Anyone can write a notification
-      allow write: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update, delete: if isSignedIn() && resource.data.userId == request.auth.uid;
     }
   }
 }

@@ -1,5 +1,5 @@
 /* eslint-disable no-unused-vars, react-hooks/exhaustive-deps */
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { db, auth } from '../firebase';
 import { doc, updateDoc, deleteField } from 'firebase/firestore';
@@ -18,11 +18,15 @@ export default function Profile() {
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
 
+  useEffect(() => { if (userData?.name && !name) setName(userData.name); }, [userData]);
+
   async function handleSave(e) {
     e.preventDefault();
     setLoading(true);
     setMessage('');
     setError('');
+
+    if (!name.trim()) { alert('İsim alanı boş olamaz.'); setLoading(false); return; }
 
     if (password && password !== confirmPassword) {
       setError('Şifreler eşleşmiyor!');

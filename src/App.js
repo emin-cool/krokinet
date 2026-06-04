@@ -117,7 +117,7 @@ class ErrorBoundary extends React.Component {
   static getDerivedStateFromError(error) { return { hasError: true, error }; }
   componentDidCatch(error, errorInfo) { console.error(error, errorInfo); }
   render() {
-    if (this.state.hasError) return <div style={{padding: 20, color: 'red'}}><h1>Something went wrong.</h1><pre>{this.state.error.toString()}</pre></div>;
+    if (this.state.hasError) return <div style={{padding: 20, textAlign: 'center'}}><h1 style={{color: 'var(--text-main)'}}>Beklenmeyen bir hata oluştu</h1><p style={{color: '#64748b'}}>Lütfen sayfayı yenileyin.</p><button onClick={() => window.location.reload()} style={{marginTop: 16, padding: '10px 24px', borderRadius: 8, border: 'none', background: 'var(--primary-gradient, #6366f1)', color: '#fff', cursor: 'pointer', fontSize: 14}}>Sayfayı Yenile</button></div>;
     return this.props.children;
   }
 }

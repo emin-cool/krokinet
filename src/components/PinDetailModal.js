@@ -1,7 +1,7 @@
 /* eslint-disable no-unused-vars, react-hooks/exhaustive-deps */
 import React, { useState, useEffect, useRef } from 'react';
 import { db } from '../firebase';
-import { collection, query, where, orderBy, onSnapshot, addDoc, serverTimestamp, updateDoc, doc, deleteDoc, getDocs, getDoc } from 'firebase/firestore';
+import { collection, query, where, orderBy, onSnapshot, addDoc, serverTimestamp, updateDoc, doc, deleteDoc, getDocs, getDoc, writeBatch } from 'firebase/firestore';
 import { useAuth } from '../contexts/AuthContext';
 import ProjectGallery from './ProjectGallery';
 import ImageMarkupModal from './ImageMarkupModal';
@@ -52,6 +52,15 @@ export default function PinDetailModal({ pin, projectId, isManager, onClose }) {
 
   const { currentUser, userData } = useAuth();
   const bottomRef = useRef(null);
+  const objectUrlRef = useRef(null);
+
+  useEffect(() => {
+    return () => {
+      if (objectUrlRef.current) {
+        URL.revokeObjectURL(objectUrlRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     const q = query(collection(db, 'messages'), where('pinId', '==', pin.id), orderBy('createdAt', 'asc'));
@@ -146,6 +155,7 @@ export default function PinDetailModal({ pin, projectId, isManager, onClose }) {
     try {
       const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD}/auto/upload`, { method: 'POST', body: formData });
       const data = await res.json();
+      if (!res.ok || data.error) { alert('Dosya yüklenemedi.'); setUploading(false); return; }
       if (target === 'chat') {
         await sendMessage(data.secure_url, file.type);
       } else {
@@ -166,8 +176,12 @@ export default function PinDetailModal({ pin, projectId, isManager, onClose }) {
     if (!file) return;
     
     if (file.type.startsWith('image/')) {
-      // Eğer fotoğrafsa çizim ekranını aç
-      setMarkupImageUrl(URL.createObjectURL(file));
+      if (objectUrlRef.current) {
+        URL.revokeObjectURL(objectUrlRef.current);
+      }
+      const newUrl = URL.createObjectURL(file);
+      objectUrlRef.current = newUrl;
+      setMarkupImageUrl(newUrl);
       setMarkupTarget(target);
     } else {
       let description = '';
@@ -223,14 +237,11 @@ export default function PinDetailModal({ pin, projectId, isManager, onClose }) {
       color: newColor
     });
     setEditingHeader(false);
-    pin.title = pinTitle;
-    pin.category = pinCategory;
-    pin.color = newColor;
     setPinColor(newColor);
   }
 
   async function deletePin() {
-    const action = window.prompt('Pini kaldırmak için "arsiv" veya "sil" yazın:\\n\\narsiv: Pin gizlenir, arşive kaldırılır.\\nsil: Pin ve içindeki her şey KÖKTEN silinir.');
+    const action = window.prompt('Pini kaldırmak için "arsiv" veya "sil" yazın:\n\narsiv: Pin gizlenir, arşive kaldırılır.\nsil: Pin ve içindeki her şey KÖKTEN silinir.');
     
     if (action === 'arsiv' || action === 'arşiv') {
       await updateDoc(doc(db, 'pins', pin.id), { isArchived: true });
@@ -239,16 +250,13 @@ export default function PinDetailModal({ pin, projectId, isManager, onClose }) {
       if (!window.confirm('DİKKAT: Pin, mesajlar ve dosyalar tamamen SİLİNECEK! Emin misiniz?')) return;
       
       try {
-        // Delete messages
-        for (const msg of messages) {
-          await deleteDoc(doc(db, 'messages', msg.id));
-        }
-        // Delete files
-        for (const file of files) {
-          await deleteDoc(doc(db, 'files', file.id));
-        }
-        // Delete pin
-        await deleteDoc(doc(db, 'pins', pin.id));
+        const batch = writeBatch(db);
+        const msgSnap = await getDocs(query(collection(db, 'messages'), where('pinId', '==', pin.id)));
+        msgSnap.forEach(d => batch.delete(d.ref));
+        const fileSnap = await getDocs(query(collection(db, 'files'), where('pinId', '==', pin.id)));
+        fileSnap.forEach(d => batch.delete(d.ref));
+        batch.delete(doc(db, 'pins', pin.id));
+        await batch.commit();
         onClose();
       } catch (err) {
         console.error("Silme hatası:", err);
@@ -260,16 +268,13 @@ export default function PinDetailModal({ pin, projectId, isManager, onClose }) {
   async function permanentDeletePin() {
     if (!window.confirm('DİKKAT: Pin, mesajlar ve dosyalar tamamen SİLİNECEK! Emin misiniz?')) return;
     try {
-      // Delete messages
-      for (const msg of messages) {
-        await deleteDoc(doc(db, 'messages', msg.id));
-      }
-      // Delete files
-      for (const file of files) {
-        await deleteDoc(doc(db, 'files', file.id));
-      }
-      // Delete pin
-      await deleteDoc(doc(db, 'pins', pin.id));
+      const batch = writeBatch(db);
+      const msgSnap = await getDocs(query(collection(db, 'messages'), where('pinId', '==', pin.id)));
+      msgSnap.forEach(d => batch.delete(d.ref));
+      const fileSnap = await getDocs(query(collection(db, 'files'), where('pinId', '==', pin.id)));
+      fileSnap.forEach(d => batch.delete(d.ref));
+      batch.delete(doc(db, 'pins', pin.id));
+      await batch.commit();
       onClose();
     } catch (err) {
       console.error("Silinirken hata:", err);
@@ -321,7 +326,7 @@ export default function PinDetailModal({ pin, projectId, isManager, onClose }) {
   };
 
   const handleMentionSelect = (name) => {
-    const replaced = text.replace(/(?:\s|^)@(\S*)$/, ` @${name.replace(/\s+/g, '')} `);
+    const replaced = text.replace(/(?:\s|^)@(\S*)$/, (match, p1, offset) => (offset === 0 ? '' : ' ') + '@' + name.replace(/\s+/g, '') + ' ');
     setText(replaced);
     setShowMention(false);
   };

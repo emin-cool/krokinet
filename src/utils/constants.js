@@ -19,3 +19,33 @@ export const SECTIONS = [
   { key: 'ahsap', title: '🪵 Ahşap' },
   { key: 'tesisat', title: '🔵 Tesisat' },
 ];
+
+// Centralized category colors — D19, K7 fix
+export const CATEGORY_COLORS = {
+  'yapısal': '#ef4444',
+  'elektrik': '#eab308',
+  'tesisat': '#22c55e',
+  'mekanik': '#f97316',
+  'mimari': '#a855f7',
+  'joker': '#ec4899',
+  'genel': '#3b82f6',
+};
+
+export const PIN_COLORS = {
+  'açık': '#ef4444',
+  'devam ediyor': '#f59e0b',
+  'çözüldü': '#22c55e',
+};
+
+// Strong password generator — Y1 fix
+export function generateStrongPassword(length = 14) {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%&*';
+  const array = new Uint32Array(length);
+  crypto.getRandomValues(array);
+  return Array.from(array, (v) => chars[v % chars.length]).join('');
+}
+
+// Unique ID generator — O21, D20 fix
+export function generateUniqueId() {
+  return Date.now().toString(36) + '-' + Math.random().toString(36).substr(2, 9);
+}

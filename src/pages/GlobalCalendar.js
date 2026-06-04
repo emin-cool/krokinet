@@ -16,7 +16,7 @@ const localizer = momentLocalizer(moment);
 const DnDCalendar = withDragAndDrop(Calendar);
 
 export default function GlobalCalendar() {
-  const { userData, currentUser } = useAuth();
+  const { currentUser } = useAuth();
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   
@@ -48,8 +48,8 @@ export default function GlobalCalendar() {
         return {
           id: doc.id,
           title: data.title,
-          start: data.start ? new Date(data.start.toDate ? data.start.toDate() : data.start) : new Date(),
-          end: data.end ? new Date(data.end.toDate ? data.end.toDate() : data.end) : new Date(),
+          start: data.start?.toDate ? data.start.toDate() : new Date(data.start),
+          end: data.end?.toDate ? data.end.toDate() : new Date(data.end),
           color: data.color || '#a855f7',
           description: data.description || '',
           userId: data.userId
@@ -64,18 +64,28 @@ export default function GlobalCalendar() {
 
   // --- Drag & Drop Handlers ---
   const moveEvent = async ({ event, start, end, isAllDay: droppedOnAllDaySlot = false }) => {
-    const updatedEvent = { ...event, start, end, allDay: droppedOnAllDaySlot };
-    await updateDoc(doc(db, 'personal_calendar_events', event.id), {
-      start: start.toISOString(),
-      end: end.toISOString()
-    });
+    try {
+      await updateDoc(doc(db, 'personal_calendar_events', event.id), {
+        start: start.toISOString(),
+        end: end.toISOString(),
+        allDay: droppedOnAllDaySlot || false
+      });
+    } catch (err) {
+      console.error(err);
+      alert('Etkinlik güncellenemedi.');
+    }
   };
 
   const resizeEvent = async ({ event, start, end }) => {
-    await updateDoc(doc(db, 'personal_calendar_events', event.id), {
-      start: start.toISOString(),
-      end: end.toISOString()
-    });
+    try {
+      await updateDoc(doc(db, 'personal_calendar_events', event.id), {
+        start: start.toISOString(),
+        end: end.toISOString()
+      });
+    } catch (err) {
+      console.error(err);
+      alert('Etkinlik güncellenemedi.');
+    }
   };
 
   // --- Normal CRUD Handlers ---
@@ -174,10 +184,10 @@ export default function GlobalCalendar() {
 
   if (loading) return <div className="loading">Takvim yükleniyor...</div>;
 
-  const today = new Date();
-  today.setHours(0,0,0,0);
-  const upcomingTasks = events.filter(e => e.start >= today && e.start <= new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000)).sort((a,b) => a.start - b.start);
-  const todayTasks = events.filter(e => e.start <= today && e.end >= today);
+  const todayStart = new Date(); todayStart.setHours(0,0,0,0);
+  const todayEnd = new Date(); todayEnd.setHours(23,59,59,999);
+  const upcomingTasks = events.filter(e => e.start >= todayStart && e.start <= new Date(todayStart.getTime() + 7 * 24 * 60 * 60 * 1000)).sort((a,b) => a.start - b.start);
+  const todayTasks = events.filter(e => e.start <= todayEnd && e.end >= todayStart);
 
   return (
     <div style={{ padding: '24px', background: 'var(--bg-main)', minHeight: 'calc(100vh - 120px)' }}>

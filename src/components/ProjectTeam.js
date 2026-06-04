@@ -1,7 +1,8 @@
 /* eslint-disable no-unused-vars, react-hooks/exhaustive-deps */
 import React, { useState, useEffect } from 'react';
 import { db } from '../firebase';
-import { collection, getDocs, addDoc, doc, setDoc, serverTimestamp, updateDoc, arrayUnion, arrayRemove, getDoc, onSnapshot, query, limit } from 'firebase/firestore';
+import { collection, getDocs, addDoc, doc, setDoc, serverTimestamp, updateDoc, arrayUnion, arrayRemove, getDoc, onSnapshot, query, limit, deleteField } from 'firebase/firestore';
+import { generateStrongPassword } from '../utils/constants';
 import { initializeApp, getApps } from 'firebase/app';
 import { getAuth, createUserWithEmailAndPassword } from 'firebase/auth';
 
@@ -75,7 +76,7 @@ export default function ProjectTeam({ projectId, isManager }) {
     // Auto-generate username & password
     const safeName = newUser.name.toLowerCase().replace(/[^a-z0-9]/g, '');
     const autoUsername = safeName + Math.floor(Math.random() * 1000);
-    const autoPassword = "insaat" + Math.floor(Math.random() * 900 + 100);
+    const autoPassword = generateStrongPassword();
     try {
       const selectedGroup = groups.find(g => g.id === newUser.groupId);
       const finalTitle = newUser.customTitle.trim() || selectedGroup?.name || '';
@@ -114,7 +115,7 @@ export default function ProjectTeam({ projectId, isManager }) {
     const projectRef = doc(db, 'projects', projectId);
     await updateDoc(projectRef, { 
       memberIds: arrayRemove(userId),
-      [`memberRoles.${userId}`]: null // Roles will be cleaned up slightly, technically firebase requires deleteField() but null is fine to unset logic
+      [`memberRoles.${userId}`]: deleteField()
     });
   }
 
@@ -177,7 +178,7 @@ export default function ProjectTeam({ projectId, isManager }) {
                               <th style={{ padding: '10px 16px', color: '#94a3b8', fontWeight: 600 }}>Ad Soyad</th>
                               <th style={{ padding: '10px 16px', color: '#94a3b8', fontWeight: 600 }}>Ünvan</th>
                               <th style={{ padding: '10px 16px', color: '#94a3b8', fontWeight: 600 }}>Kullanıcı Adı</th>
-                              <th style={{ padding: '10px 16px', color: '#94a3b8', fontWeight: 600 }}>Şifre</th>
+                              <th style={{ padding: '10px 16px', color: '#94a3b8', fontWeight: 600 }}>Durum</th>
                               <th style={{ padding: '10px 16px', color: '#94a3b8', fontWeight: 600, textAlign: 'right' }}>İşlem</th>
                             </tr>
                           </thead>
@@ -187,9 +188,7 @@ export default function ProjectTeam({ projectId, isManager }) {
                                 <td style={{ padding: '10px 16px' }}>{member.name}</td>
                                 <td style={{ padding: '10px 16px', color: '#94a3b8' }}>{member.role || 'Çalışan'}</td>
                                 <td style={{ padding: '10px 16px', fontFamily: 'monospace', color: '#3b82f6' }}>{member.username}</td>
-                                <td style={{ padding: '10px 16px', fontFamily: 'monospace' }}>
-                                  {member.tempPassword ? member.tempPassword : <span style={{color: '#10b981', fontSize: 11}}>Kullanıcı değiştirdi</span>}
-                                </td>
+                                <td style={{ padding: '10px 16px', fontFamily: 'monospace', color: '#94a3b8' }}>Şifre gizli</td>
                                 <td style={{ padding: '10px 16px', textAlign: 'right' }}>
                                   <button onClick={() => removeUser(member.id)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: 12 }}>Çıkar</button>
                                 </td>

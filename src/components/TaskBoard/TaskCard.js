@@ -1,19 +1,10 @@
 import React from 'react';
 import moment from 'moment';
 import { AlertCircle, CalendarClock, CalendarPlus } from 'lucide-react';
-
-const CATEGORY_COLORS = {
-  'yapısal': '#ef4444', 
-  'elektrik': '#eab308', 
-  'tesisat': '#22c55e', 
-  'mekanik': '#f97316', 
-  'mimari': '#a855f7', 
-  'joker': '#ec4899',
-  'Tümü': '#3b82f6'
-};
+import { CATEGORY_COLORS } from '../../utils/constants';
 
 export default function TaskCard({ task, onClick, onAddToCalendar }) {
-  const isOverdue = task.progress < 100 && new Date(task.endDate) < new Date();
+  const isOverdue = task.progress < 100 && new Date(task.end) < new Date();
 
   // Progress Bar Renklendirme
   let progressColor = 'var(--primary-color)';
@@ -71,7 +62,7 @@ export default function TaskCard({ task, onClick, onAddToCalendar }) {
       {/* Orta Kısım: Tarih */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--text-muted)', fontSize: '13px', flex: 1, minWidth: '120px' }}>
         <CalendarClock size={16} />
-        <span style={{ whiteSpace: 'nowrap' }}>{moment(task.startDate).format('DD MMM')} - {moment(task.endDate).format('DD MMM')}</span>
+        <span style={{ whiteSpace: 'nowrap' }}>{moment(task.start).format('DD MMM')} - {moment(task.end).format('DD MMM')}</span>
       </div>
 
       {/* Sağ Kısım: İlerleme Çubuğu ve Aksiyonlar */}

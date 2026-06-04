@@ -9,12 +9,13 @@ import 'react-big-calendar/lib/addons/dragAndDrop/styles.css';
 import { Gantt, ViewMode } from 'gantt-task-react';
 import 'gantt-task-react/dist/index.css';
 import { db } from '../firebase';
-import { updateDoc, doc, addDoc, collection, query, where, getDocs } from 'firebase/firestore';
+import { updateDoc, doc, addDoc, collection, query, where, getDocs, deleteDoc } from 'firebase/firestore';
 import { Trash2, Download, LayoutGrid, BarChartHorizontal, AlertCircle, Clock, CalendarDays } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { useAuth } from '../contexts/AuthContext';
 import TaskBoard from './TaskBoard/TaskBoard';
+import { CATEGORY_COLORS, generateUniqueId } from '../utils/constants';
 
 moment.locale('tr');
 const localizer = momentLocalizer(moment);
@@ -25,14 +26,7 @@ export default function ProjectSchedule({ project, projectId, fetchProject, isMa
   const [activeTab, setActiveTab] = useState('calendar'); 
   const [categoryFilter, setCategoryFilter] = useState('Tümü');
 
-  const CATEGORY_COLORS = {
-    'yapısal': '#ef4444', 
-    'elektrik': '#eab308', 
-    'tesisat': '#22c55e', 
-    'mekanik': '#f97316', 
-    'mimari': '#a855f7', 
-    'joker': '#ec4899'
-  };
+
   
   const [showModal, setShowModal] = useState(false);
   const [editingTask, setEditingTask] = useState(null);
@@ -56,13 +50,14 @@ export default function ProjectSchedule({ project, projectId, fetchProject, isMa
   }));
 
   const today = new Date();
-  today.setHours(0,0,0,0);
+  const todayStart = new Date(today);
+  todayStart.setHours(0,0,0,0);
 
   const displayedEvents = categoryFilter === 'Tümü' ? events : events.filter(e => e.category === categoryFilter);
 
-  const upcomingTasks = displayedEvents.filter(e => e.start >= today && e.start <= new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000)).sort((a,b) => a.start - b.start);
-  const delayedTasks = displayedEvents.filter(e => e.end < today && e.progress < 100).sort((a,b) => b.end - a.end);
-  const todayTasks = displayedEvents.filter(e => e.start <= today && e.end >= today);
+  const upcomingTasks = displayedEvents.filter(e => e.start >= todayStart && e.start <= new Date(todayStart.getTime() + 7 * 24 * 60 * 60 * 1000)).sort((a,b) => a.start - b.start);
+  const delayedTasks = displayedEvents.filter(e => e.end < todayStart && e.progress < 100).sort((a,b) => b.end - a.end);
+  const todayTasks = displayedEvents.filter(e => e.start <= todayStart && e.end >= todayStart);
 
   const downloadPDF = () => {
     const doc = new jsPDF('landscape');
@@ -75,7 +70,7 @@ export default function ProjectSchedule({ project, projectId, fetchProject, isMa
     const tableData = displayedEvents.sort((a,b) => a.start - b.start).map(e => [
       e.title, e.category, moment(e.start).format('DD MMM YYYY HH:mm'), moment(e.end).format('DD MMM YYYY HH:mm'),
       e.dependencies ? events.find(ev => ev.id === e.dependencies)?.title || '-' : '-',
-      e.end < today && e.progress < 100 ? 'Gecikti' : `%${e.progress}`
+      e.end < todayStart && e.progress < 100 ? 'Gecikti' : `%${e.progress}`
     ]);
 
     autoTable(doc, {
@@ -235,7 +230,7 @@ export default function ProjectSchedule({ project, projectId, fetchProject, isMa
     } else {
       newSchedule.push({
         ...taskData,
-        id: Date.now().toString(),
+        id: generateUniqueId(),
         createdAt: new Date().toISOString()
       });
     }
@@ -248,32 +243,31 @@ export default function ProjectSchedule({ project, projectId, fetchProject, isMa
          // We should update the task that was directly edited
          const q = query(collection(db, 'personal_calendar_events'), where('taskId', '==', editingTask.id));
          const snapshot = await getDocs(q);
-         snapshot.forEach(async (docSnap) => {
-           await updateDoc(docSnap.ref, {
-             start: taskData.startDate,
-             end: taskData.endDate,
-             title: `[Proje: ${project.name}] ${taskData.title}`,
-             color: taskData.color || '#3b82f6',
-             category: taskData.category || 'Belirtilmedi',
-             description: taskData.description || '',
-             updatedAt: new Date().toISOString()
-           });
-         });
+          await Promise.all(snapshot.docs.map(async (docSnap) => {
+            await updateDoc(docSnap.ref, {
+              start: taskData.startDate,
+              end: taskData.endDate,
+              title: `[Proje: ${project.name}] ${taskData.title}`,
+              color: taskData.color || '#3b82f6',
+              category: taskData.category || 'Belirtilmedi',
+              description: taskData.description || '',
+              updatedAt: new Date().toISOString()
+            });
+          }));
 
          // If cascaded, we could sync all shifted ones, but let's just sync the whole newSchedule for any linked tasks
          if (timeDiff !== 0) {
-            newSchedule.forEach(async (t) => {
-              if (t.id === editingTask.id) return; // already synced
-              const q2 = query(collection(db, 'personal_calendar_events'), where('taskId', '==', t.id));
-              const snap2 = await getDocs(q2);
-              snap2.forEach(async (dSnap) => {
-                 await updateDoc(dSnap.ref, {
-                   start: new Date(t.startDate || t.start).toISOString(),
-                   end: new Date(t.endDate || t.end).toISOString(),
-                   updatedAt: new Date().toISOString()
-                 });
-              });
-            });
+             await Promise.all(newSchedule.filter(t => t.id !== editingTask.id).map(async (t) => {
+               const q2 = query(collection(db, 'personal_calendar_events'), where('taskId', '==', t.id));
+               const snap2 = await getDocs(q2);
+               await Promise.all(snap2.docs.map(async (dSnap) => {
+                  await updateDoc(dSnap.ref, {
+                    start: new Date(t.startDate || t.start).toISOString(),
+                    end: new Date(t.endDate || t.end).toISOString(),
+                    updatedAt: new Date().toISOString()
+                  });
+               }));
+             }));
          }
        } catch (err) {
          console.error("Calendar sync failed:", err);
@@ -292,13 +286,9 @@ export default function ProjectSchedule({ project, projectId, fetchProject, isMa
       try {
         const q = query(collection(db, 'personal_calendar_events'), where('taskId', '==', editingTask.id));
         const snapshot = await getDocs(q);
-        snapshot.forEach(async (docSnap) => {
-          // Just update it as deleted or delete the document? Let's delete it.
-          // Wait, we need deleteDoc imported for this. I'll just change the title to [Silindi] for now to avoid needing another import.
-          await updateDoc(docSnap.ref, {
-             title: `[SİLİNDİ] ${editingTask.title}`
-          });
-        });
+        await Promise.all(snapshot.docs.map(async (docSnap) => {
+          await deleteDoc(docSnap.ref);
+        }));
       } catch (e) {}
       setShowModal(false);
     }
@@ -307,6 +297,9 @@ export default function ProjectSchedule({ project, projectId, fetchProject, isMa
   const handleAddToCalendar = async (task, e) => {
     if (e) e.stopPropagation();
     try {
+      const existingQ = query(collection(db, 'personal_calendar_events'), where('taskId', '==', task.id), where('userId', '==', currentUser.uid));
+      const existingSnap = await getDocs(existingQ);
+      if (!existingSnap.empty) { alert('Bu görev zaten takviminizde mevcut.'); return; }
       await addDoc(collection(db, 'personal_calendar_events'), {
         title: `[Proje: ${project.name}] ${task.title}`,
         start: new Date(task.start).toISOString(),

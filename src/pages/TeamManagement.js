@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../firebase';
 import { collection, getDocs, addDoc, deleteDoc, doc, serverTimestamp, setDoc, onSnapshot, query, limit } from 'firebase/firestore';
+import { generateStrongPassword } from '../utils/constants';
 import { initializeApp, getApps } from 'firebase/app';
 import { getAuth, createUserWithEmailAndPassword } from 'firebase/auth';
 
@@ -56,13 +57,14 @@ export default function TeamManagement({ onClose }) {
   }
 
   async function createUser() {
-    if (!newUser.name || !newUser.email || !newUser.password || !newUser.groupId) {
+    if (!newUser.name || !newUser.email || !newUser.groupId) {
       alert('Tüm alanları doldurun'); return;
     }
     setLoading(true);
+    const autoPassword = generateStrongPassword();
     try {
       const selectedGroup = groups.find(g => g.id === newUser.groupId);
-      const userCred = await createUserWithEmailAndPassword(secondaryAuth, newUser.email, newUser.password);
+      const userCred = await createUserWithEmailAndPassword(secondaryAuth, newUser.email, autoPassword);
       await setDoc(doc(db, 'users', userCred.user.uid), {
         name: newUser.name,
         email: newUser.email,
@@ -72,7 +74,7 @@ export default function TeamManagement({ onClose }) {
       });
       await secondaryAuth.signOut();
       setNewUser({ name: '', email: '', password: '', groupId: '' });
-      alert('Kullanıcı başarıyla oluşturuldu!');
+      alert(`Kullanıcı başarıyla oluşturuldu!\n\nGeçici Şifre: ${autoPassword}\n\nLütfen bu şifreyi kullanıcıyla paylaşın.`);
     } catch (err) {
       alert('Hata: ' + err.message);
     }
@@ -116,7 +118,6 @@ export default function TeamManagement({ onClose }) {
             <div className="add-user-form">
               <input placeholder="Ad Soyad *" value={newUser.name} onChange={e => setNewUser({...newUser, name: e.target.value})} />
               <input placeholder="Email *" type="email" value={newUser.email} onChange={e => setNewUser({...newUser, email: e.target.value})} />
-              <input placeholder="Şifre *" type="password" value={newUser.password} onChange={e => setNewUser({...newUser, password: e.target.value})} />
               <select value={newUser.groupId} onChange={e => setNewUser({...newUser, groupId: e.target.value})}>
                 <option value="">Grup Seç *</option>
                 {groups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}

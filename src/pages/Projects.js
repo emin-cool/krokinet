@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { db, auth } from '../firebase';
-import { collection, query, where, getDocs, addDoc, serverTimestamp, updateDoc, doc, deleteDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, addDoc, serverTimestamp, updateDoc, doc, deleteDoc, writeBatch } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
 import { useAuth } from '../contexts/AuthContext';
 import MarketPrices from './MarketPrices';
@@ -169,6 +169,19 @@ export default function Projects() {
                           onClick={async (e) => {
                             e.stopPropagation();
                             if (window.confirm("DİKKAT: Bu proje KALICI OLARAK silinecektir. Devam etmek istiyor musunuz?")) {
+                              const pinsSnap = await getDocs(query(collection(db, 'pins'), where('projectId', '==', project.id)));
+                              let batch = writeBatch(db);
+                              let opCount = 0;
+                              for (const pinDoc of pinsSnap.docs) {
+                                batch.delete(pinDoc.ref);
+                                opCount++;
+                                const msgsSnap = await getDocs(query(collection(db, 'messages'), where('pinId', '==', pinDoc.id)));
+                                for (const msgDoc of msgsSnap.docs) { batch.delete(msgDoc.ref); opCount++; }
+                                if (opCount >= 450) { await batch.commit(); batch = writeBatch(db); opCount = 0; }
+                              }
+                              const notifsSnap = await getDocs(query(collection(db, 'notifications'), where('projectId', '==', project.id)));
+                              for (const nDoc of notifsSnap.docs) { batch.delete(nDoc.ref); opCount++; }
+                              if (opCount > 0) await batch.commit();
                               await deleteDoc(doc(db, 'projects', project.id));
                               fetchProjects();
                             }

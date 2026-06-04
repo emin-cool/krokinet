@@ -5,6 +5,7 @@ import { db } from '../firebase';
 import { doc, getDoc, collection, query, where, addDoc, serverTimestamp, onSnapshot, updateDoc, getDocs, writeBatch, deleteDoc } from 'firebase/firestore';
 import { useAuth } from '../contexts/AuthContext';
 import PinDetailModal from '../components/PinDetailModal';
+import { CATEGORY_COLORS, PIN_COLORS } from '../utils/constants';
 
 import ProjectGallery from '../components/ProjectGallery';
 import ProjectTeam from '../components/ProjectTeam';
@@ -13,15 +14,6 @@ import NotificationsDropdown from '../components/NotificationsDropdown';
 import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
 import { Building, Ruler, MessageSquare, Info, Users, MapPin, Archive, ArrowLeft, CalendarDays, Trash2 } from 'lucide-react';
 
-const PIN_COLORS = { 'açık': '#ef4444', 'devam ediyor': '#f59e0b', 'çözüldü': '#22c55e' };
-const CATEGORY_COLORS = {
-  'yapısal': '#ef4444', 
-  'elektrik': '#eab308', 
-  'tesisat': '#22c55e', 
-  'mekanik': '#f97316', 
-  'mimari': '#a855f7', 
-  'joker': '#ec4899'
-};
 const CATEGORIES = Object.keys(CATEGORY_COLORS);
 
 const CLOUDINARY_CLOUD = 'dcx4qribb';
@@ -67,6 +59,7 @@ export default function ProjectDetail() {
       snap => {
         const loadedPins = snap.docs.map(d => ({ id: d.id, ...d.data() }));
         setPins(loadedPins);
+        setSelectedPin(prev => prev ? loadedPins.find(p => p.id === prev.id) || null : null);
         
         // Bildirimden gelen pin parametresini kontrol et
         const pinIdFromUrl = searchParams.get('pin');
@@ -109,28 +102,35 @@ export default function ProjectDetail() {
     
     try {
       // Find all pins on this floor
-      const qPins = query(collection(db, 'pins'), where('projectId', '==', projectId), where('floorIndex', '==', index));
+      const qPins = query(collection(db, 'pins'), where('projectId', '==', projectId), where('floorPlanIndex', '==', index));
       const pinsSnap = await getDocs(qPins);
       
-      const batch = writeBatch(db);
+      let batch = writeBatch(db);
+      let opCount = 0;
       
       for (const pinDoc of pinsSnap.docs) {
-        // Fetch and delete messages
         const qMessages = query(collection(db, 'messages'), where('pinId', '==', pinDoc.id));
         const messagesSnap = await getDocs(qMessages);
-        messagesSnap.docs.forEach(m => batch.delete(m.ref));
+        for (const m of messagesSnap.docs) {
+          batch.delete(m.ref);
+          opCount++;
+          if (opCount >= 450) { await batch.commit(); batch = writeBatch(db); opCount = 0; }
+        }
         
-        // Fetch and delete files
         const qFiles = query(collection(db, 'files'), where('pinId', '==', pinDoc.id));
         const filesSnap = await getDocs(qFiles);
-        filesSnap.docs.forEach(f => batch.delete(f.ref));
+        for (const f of filesSnap.docs) {
+          batch.delete(f.ref);
+          opCount++;
+          if (opCount >= 450) { await batch.commit(); batch = writeBatch(db); opCount = 0; }
+        }
         
-        // Delete the pin itself
         batch.delete(pinDoc.ref);
+        opCount++;
+        if (opCount >= 450) { await batch.commit(); batch = writeBatch(db); opCount = 0; }
       }
       
-      // Commit the batch delete
-      await batch.commit();
+      if (opCount > 0) await batch.commit();
 
       // Update the floor plan array in the project
       const updatedPlans = project.floorPlans.filter((_, i) => i !== index);
@@ -141,8 +141,8 @@ export default function ProjectDetail() {
       const shiftBatch = writeBatch(db);
       allPinsSnap.docs.forEach(p => {
         const pData = p.data();
-        if (pData.floorIndex > index) {
-          shiftBatch.update(p.ref, { floorIndex: pData.floorIndex - 1 });
+        if (pData.floorPlanIndex > index) {
+          shiftBatch.update(p.ref, { floorPlanIndex: pData.floorPlanIndex - 1 });
         }
       });
       await shiftBatch.commit();
@@ -163,7 +163,8 @@ export default function ProjectDetail() {
       updatedPlans[index] = { ...updatedPlans[index], isArchived: !currentStatus };
       await updateDoc(doc(db, 'projects', projectId), { floorPlans: updatedPlans });
       if (!currentStatus && activeFloor === index) {
-        setActiveFloor(0);
+        const fallback = floorPlans.findIndex((fp, i) => i !== index && !fp.isArchived);
+        setActiveFloor(fallback >= 0 ? fallback : 0);
       }
       fetchProject();
     } catch (error) {
@@ -174,12 +175,16 @@ export default function ProjectDetail() {
 
   async function renameFloorPlan(index, newName) {
     if (!newName.trim()) { setEditingFloorIndex(null); return; }
-    const updatedPlans = project.floorPlans.map((fp, i) =>
-      i === index ? { ...fp, name: newName.trim() } : fp
-    );
-    await updateDoc(doc(db, 'projects', projectId), { floorPlans: updatedPlans });
-    setEditingFloorIndex(null);
-    fetchProject();
+    try {
+      const updatedPlans = project.floorPlans.map((fp, i) =>
+        i === index ? { ...fp, name: newName.trim() } : fp
+      );
+      await updateDoc(doc(db, 'projects', projectId), { floorPlans: updatedPlans });
+      setEditingFloorIndex(null);
+      fetchProject();
+    } catch (err) {
+      alert('Yeniden adlandırma başarısız.');
+    }
   }
 
   async function uploadFloorPlan(e) {
@@ -204,6 +209,7 @@ export default function ProjectDetail() {
     try {
       const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD}/image/upload`, { method: 'POST', body: formData });
       const data = await res.json();
+      if (!res.ok || data.error) { alert('Dosya yüklenemedi.'); setUploadingPlan(false); return; }
       let imageUrl = data.secure_url;
       if (file.type === 'application/pdf') {
         imageUrl = data.secure_url
@@ -271,14 +277,19 @@ export default function ProjectDetail() {
 
   const handlePointerUp = async () => {
     if (draggingPin && draggingPin.x !== undefined) {
-      await updateDoc(doc(db, 'pins', draggingPin.id), { x: draggingPin.x, y: draggingPin.y });
-      setMovingPinId(null); // Taşıma modunu kapat
+      try {
+        await updateDoc(doc(db, 'pins', draggingPin.id), { x: draggingPin.x, y: draggingPin.y });
+      } catch (err) {
+        alert('Pin konumu güncellenemedi.');
+      }
+      setMovingPinId(null);
     }
     setDraggingPin(null);
   };
 
   async function savePin() {
     if (!newPinData.title || !newPinCoords) return;
+    try {
       const docRef = await addDoc(collection(db, 'pins'), {
         ...newPinData,
         x: newPinCoords.x,
@@ -292,9 +303,7 @@ export default function ProjectDetail() {
         assignee: newPinData.assignee || ''
       });
 
-      // Bildirim gönder (Eğer birisi atandıysa ve atanan kişi ben değilsem)
       if (newPinData.assignee && newPinData.assignee !== userData?.name) {
-        // Find assigned user's ID
         const membersSnapshot = await getDocs(query(collection(db, 'users'), where('name', '==', newPinData.assignee)));
         if (!membersSnapshot.empty) {
           const assignedUser = membersSnapshot.docs[0];
@@ -310,14 +319,22 @@ export default function ProjectDetail() {
       }
 
       setAddingPin(false);
-    setNewPinData({ title: '', category: 'genel', assignee: '' });
-    setNewPinCoords(null);
+      setNewPinData({ title: '', category: 'genel', assignee: '' });
+      setNewPinCoords(null);
+    } catch (err) {
+      alert('Pin kaydedilirken hata oluştu: ' + err.message);
+    }
   }
 
   async function saveProjectInfo() {
-    await updateDoc(doc(db, 'projects', projectId), projectInfo);
-    setEditingInfo(false);
-    fetchProject();
+    try {
+      await updateDoc(doc(db, 'projects', projectId), projectInfo);
+      setEditingInfo(false);
+      fetchProject();
+    } catch (err) {
+      alert('Bilgiler kaydedilirken hata oluştu.');
+      return;
+    }
   }
 
   if (loading) return <div className="loading">Yükleniyor...</div>;
@@ -652,7 +669,7 @@ export default function ProjectDetail() {
                       <div style={{ width: 12, height: 12, borderRadius: '50%', background: pin.color || '#F59E0B' }} />
                       <span style={{ fontWeight: 'bold' }}>{pin.title}</span>
                     </div>
-                    <p style={{ fontSize: 12, color: 'var(--text-muted)' }}>{pin.category} • Kat: {project.floorPlans[pin.floorIndex]?.name}</p>
+                    <p style={{ fontSize: 12, color: 'var(--text-muted)' }}>{pin.category} • Kat: {project.floorPlans[pin.floorPlanIndex]?.name}</p>
                   </div>
                 ))}
               </div>

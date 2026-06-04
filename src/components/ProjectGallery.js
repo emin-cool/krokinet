@@ -46,7 +46,7 @@ export default function ProjectGallery({ projectId, pinId }) {
     }
 
     fetchMedia();
-  }, [projectId]);
+  }, [projectId, pinId]);
 
   if (loading) return <div className="loading">Galeri yükleniyor...</div>;
 
@@ -76,7 +76,7 @@ export default function ProjectGallery({ projectId, pinId }) {
               </a>
               <div style={{ padding: '12px' }}>
                 <div style={{ fontSize: '13px', color: '#cbd5e1', fontWeight: 600, marginBottom: 4 }}>
-                  {file.senderName}
+                  {file.userName}
                 </div>
                 <div style={{ fontSize: '11px', color: '#94a3b8' }}>
                   {pinId ? 'Pin Galerisi' : (file.pinId === 'general' ? 'Genel Sohbet' : 'Pin İçi')}
