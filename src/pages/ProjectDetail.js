@@ -51,6 +51,7 @@ export default function ProjectDetail() {
   const [editingFloorIndex, setEditingFloorIndex] = useState(null);
   const [editingFloorName, setEditingFloorName] = useState('');
   const [mapRotation, setMapRotation] = useState(0);
+  const [activeFolder, setActiveFolder] = useState(null);
 
   useEffect(() => {
     fetchProject();
@@ -224,6 +225,29 @@ export default function ProjectDetail() {
     e.target.value = '';
   }
 
+  async function createNewFolder() {
+    const folderName = window.prompt('Yeni klasör adı:');
+    if (!folderName || !folderName.trim()) return;
+    try {
+      const updatedFolders = [...(project.projectFolders || []), folderName.trim()];
+      await updateDoc(doc(db, 'projects', projectId), { projectFolders: updatedFolders });
+      fetchProject();
+    } catch (err) { alert('Klasör oluşturulamadı.'); }
+  }
+
+  async function deleteFolder(folderName) {
+    const filesInFolder = (project.projectFiles || []).filter(f => f.folder === folderName);
+    if (filesInFolder.length > 0) {
+      alert(`Bu klasörün içinde ${filesInFolder.length} adet dosya var. Klasörü silmek için önce içindeki dosyaları silmelisiniz.`);
+      return;
+    }
+    if (window.confirm(`"${folderName}" klasörünü silmek istediğinize emin misiniz?`)) {
+      const updatedFolders = (project.projectFolders || []).filter(f => f !== folderName);
+      await updateDoc(doc(db, 'projects', projectId), { projectFolders: updatedFolders });
+      fetchProject();
+    }
+  }
+
   async function uploadProjectFile(e) {
     const file = e.target.files[0];
     if (!file) return;
@@ -236,7 +260,7 @@ export default function ProjectDetail() {
       const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD}/auto/upload`, { method: 'POST', body: formData });
       const data = await res.json();
       const fileUrl = data.secure_url;
-      const updatedFiles = [...(project.projectFiles || []), { name: file.name, url: fileUrl }];
+      const updatedFiles = [...(project.projectFiles || []), { name: file.name, url: fileUrl, folder: activeFolder }];
       await updateDoc(doc(db, 'projects', projectId), { projectFiles: updatedFiles });
       fetchProject();
     } catch (err) { alert('Dosya yükleme başarısız'); }
@@ -679,32 +703,43 @@ export default function ProjectDetail() {
       )}
 
       {activeTab === 'info' && (
-        <div className="info-view">
-          {isManager && !editingInfo && (
-            <button className="btn-primary" onClick={() => setEditingInfo(true)}>✏️ Düzenle</button>
-          )}
+        <div className="info-view" style={{ padding: '20px', maxWidth: '900px', margin: '0 auto' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+            <h2 style={{ margin: 0, color: 'var(--text-main)' }}>Proje Detayları</h2>
+            {isManager && !editingInfo && (
+              <button className="btn-secondary" onClick={() => setEditingInfo(true)} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                ✏️ Düzenle
+              </button>
+            )}
+          </div>
+
           {editingInfo ? (
-            <div className="info-form">
-              <label>Proje Adı</label>
-              <input value={projectInfo.name || ''} onChange={e => setProjectInfo({...projectInfo, name: e.target.value})} />
-              <label>Açıklama</label>
-              <input value={projectInfo.description || ''} onChange={e => setProjectInfo({...projectInfo, description: e.target.value})} />
-              <label>Adres</label>
-              <input value={projectInfo.address || ''} onChange={e => setProjectInfo({...projectInfo, address: e.target.value})} />
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-                <div>
-                  <label>Başlangıç Tarihi</label>
-                  <input type="date" value={projectInfo.startDate || ''} onChange={e => setProjectInfo({...projectInfo, startDate: e.target.value})} />
-                </div>
-                <div>
-                  <label>Hedef Bitiş</label>
-                  <input type="date" value={projectInfo.endDate || ''} onChange={e => setProjectInfo({...projectInfo, endDate: e.target.value})} />
-                </div>
+            <div className="info-form" style={{ display: 'flex', flexDirection: 'column', gap: 16, background: 'var(--bg-card)', padding: 24, borderRadius: 12, border: '1px solid var(--border-color)' }}>
+              <div>
+                <label style={{ display: 'block', marginBottom: 6, fontWeight: 600, color: 'var(--text-muted)' }}>Proje Adı</label>
+                <input style={{ width: '100%', padding: 10, borderRadius: 8, border: '1px solid var(--border-color)', background: 'var(--bg-main)', color: 'var(--text-main)' }} value={projectInfo.name || ''} onChange={e => setProjectInfo({...projectInfo, name: e.target.value})} />
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+              <div>
+                <label style={{ display: 'block', marginBottom: 6, fontWeight: 600, color: 'var(--text-muted)' }}>Kısa Açıklama</label>
+                <input style={{ width: '100%', padding: 10, borderRadius: 8, border: '1px solid var(--border-color)', background: 'var(--bg-main)', color: 'var(--text-main)' }} value={projectInfo.description || ''} onChange={e => setProjectInfo({...projectInfo, description: e.target.value})} />
+              </div>
+              <div>
+                <label style={{ display: 'block', marginBottom: 6, fontWeight: 600, color: 'var(--text-muted)' }}>Açık Adres</label>
+                <textarea style={{ width: '100%', padding: 10, borderRadius: 8, border: '1px solid var(--border-color)', background: 'var(--bg-main)', color: 'var(--text-main)' }} rows={2} value={projectInfo.address || ''} onChange={e => setProjectInfo({...projectInfo, address: e.target.value})} />
+              </div>
+              
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16 }}>
                 <div>
-                  <label>Durum</label>
-                  <select value={projectInfo.status || 'devam ediyor'} onChange={e => setProjectInfo({...projectInfo, status: e.target.value})} style={{ width: '100%', padding: '12px 16px', background: 'var(--bg-main)', border: '1.5px solid var(--border-color)', borderRadius: 8, color: 'var(--text-main)' }}>
+                  <label style={{ display: 'block', marginBottom: 6, fontWeight: 600, color: 'var(--text-muted)' }}>Başlangıç Tarihi</label>
+                  <input style={{ width: '100%', padding: 10, borderRadius: 8, border: '1px solid var(--border-color)', background: 'var(--bg-main)', color: 'var(--text-main)' }} type="date" value={projectInfo.startDate || ''} onChange={e => setProjectInfo({...projectInfo, startDate: e.target.value})} />
+                </div>
+                <div>
+                  <label style={{ display: 'block', marginBottom: 6, fontWeight: 600, color: 'var(--text-muted)' }}>Hedef Bitiş</label>
+                  <input style={{ width: '100%', padding: 10, borderRadius: 8, border: '1px solid var(--border-color)', background: 'var(--bg-main)', color: 'var(--text-main)' }} type="date" value={projectInfo.endDate || ''} onChange={e => setProjectInfo({...projectInfo, endDate: e.target.value})} />
+                </div>
+                <div>
+                  <label style={{ display: 'block', marginBottom: 6, fontWeight: 600, color: 'var(--text-muted)' }}>Durum</label>
+                  <select value={projectInfo.status || 'devam ediyor'} onChange={e => setProjectInfo({...projectInfo, status: e.target.value})} style={{ width: '100%', padding: 10, borderRadius: 8, border: '1px solid var(--border-color)', background: 'var(--bg-main)', color: 'var(--text-main)' }}>
                     <option value="planlama">🏗️ Planlama</option>
                     <option value="devam ediyor">🚧 Devam Ediyor</option>
                     <option value="duraklatıldı">⏸️ Duraklatıldı</option>
@@ -712,150 +747,173 @@ export default function ProjectDetail() {
                   </select>
                 </div>
                 <div>
-                  <label>İlerleme Yüzdesi (%)</label>
-                  <input type="number" min="0" max="100" value={projectInfo.progress || 0} onChange={e => setProjectInfo({...projectInfo, progress: Number(e.target.value)})} />
+                  <label style={{ display: 'block', marginBottom: 6, fontWeight: 600, color: 'var(--text-muted)' }}>İlerleme Yüzdesi (%)</label>
+                  <input style={{ width: '100%', padding: 10, borderRadius: 8, border: '1px solid var(--border-color)', background: 'var(--bg-main)', color: 'var(--text-main)' }} type="number" min="0" max="100" value={projectInfo.progress || 0} onChange={e => setProjectInfo({...projectInfo, progress: Number(e.target.value)})} />
                 </div>
               </div>
-              <label>Genel Notlar</label>
-              <textarea value={projectInfo.notes || ''} onChange={e => setProjectInfo({...projectInfo, notes: e.target.value})} rows={4} style={{ background: 'var(--bg-main)', color: 'var(--text-main)' }} />
               
-              <div className="dashboard-card" style={{ marginTop: 20, marginBottom: 20 }}>
-                <div className="dashboard-card-title">📁 PROJE DOSYALARI (DWG, Render, PDF vs.)</div>
-                {isManager && (
-                  <label className="btn-secondary" style={{ cursor: 'pointer', display: 'inline-block', marginBottom: 16 }}>
-                    {uploadingProjectFile ? 'Yükleniyor...' : '➕ Yeni Dosya Yükle'}
-                    <input type="file" hidden onChange={uploadProjectFile} />
-                  </label>
-                )}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  {(project.projectFiles || []).length === 0 ? (
-                    <p style={{ fontSize: 13, color: 'var(--text-muted)' }}>Henüz dosya yüklenmemiş.</p>
-                  ) : (
-                    project.projectFiles.map((f, i) => (
-                      <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-main)', padding: '10px 14px', borderRadius: 8, border: '1px solid var(--border-color)' }}>
-                        <span style={{ fontSize: 14, color: 'var(--text-main)', wordBreak: 'break-all' }}>{f.name}</span>
-                        <div style={{ display: 'flex', gap: 8 }}>
-                          <a href={f.url} target="_blank" rel="noreferrer" className="btn-primary" style={{ padding: '6px 12px', textDecoration: 'none', fontSize: 12 }}>İndir</a>
-                          {isManager && (
-                            <button className="btn-danger" style={{ padding: '6px 12px', fontSize: 12 }} onClick={async () => {
-                              if (window.confirm('Dosyayı silmek istediğinize emin misiniz?')) {
-                                const updatedFiles = project.projectFiles.filter((_, idx) => idx !== i);
-                                await updateDoc(doc(db, 'projects', projectId), { projectFiles: updatedFiles });
-                                fetchProject();
-                              }
-                            }}>Sil</button>
-                          )}
+              <div>
+                <label style={{ display: 'block', marginBottom: 6, fontWeight: 600, color: 'var(--text-muted)' }}>Genel Notlar</label>
+                <textarea style={{ width: '100%', padding: 10, borderRadius: 8, border: '1px solid var(--border-color)', background: 'var(--bg-main)', color: 'var(--text-main)' }} value={projectInfo.notes || ''} onChange={e => setProjectInfo({...projectInfo, notes: e.target.value})} rows={4} />
+              </div>
+              
+              <div style={{ display: 'flex', gap: 12, marginTop: 16 }}>
+                <button className="btn-primary" onClick={saveProjectInfo} style={{ flex: 1 }}>Kaydet</button>
+                <button className="btn-secondary" onClick={() => setEditingInfo(false)} style={{ flex: 1 }}>İptal</button>
+              </div>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+              
+              {/* Progress and Status Card */}
+              <div style={{ background: 'var(--bg-card)', padding: 24, borderRadius: 16, border: '1px solid var(--border-color)', boxShadow: 'var(--shadow-sm)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                  <span className={`status-label ${project.status?.toLowerCase().replace(' ', '') || 'devamediyor'}`} style={{ fontSize: 13, padding: '4px 12px', borderRadius: 20 }}>
+                    {project.status?.toUpperCase() || 'DEVAM EDİYOR'}
+                  </span>
+                  <span style={{ fontSize: 24, fontWeight: 800, color: 'var(--primary-color)' }}>%{project.progress || 0}</span>
+                </div>
+                <div style={{ width: '100%', height: 8, background: 'var(--bg-secondary)', borderRadius: 4, overflow: 'hidden' }}>
+                  <div style={{ width: `${project.progress || 0}%`, height: '100%', background: 'var(--primary-gradient)', borderRadius: 4, transition: 'all 0.5s ease-out' }} />
+                </div>
+                <p style={{ marginTop: 16, color: 'var(--text-main)', fontSize: 16, lineHeight: 1.5 }}>{project.description || 'Proje açıklaması girilmemiş.'}</p>
+              </div>
+
+              {/* Info Grid */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: 16 }}>
+                <div style={{ background: 'var(--bg-card)', padding: 16, borderRadius: 12, border: '1px solid var(--border-color)' }}>
+                  <div style={{ fontSize: 20, marginBottom: 8 }}>📍</div>
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5 }}>Adres</div>
+                  <div style={{ marginTop: 4, color: 'var(--text-main)', fontWeight: 500 }}>{project.address || 'Belirtilmemiş'}</div>
+                </div>
+                <div style={{ background: 'var(--bg-card)', padding: 16, borderRadius: 12, border: '1px solid var(--border-color)' }}>
+                  <div style={{ fontSize: 20, marginBottom: 8 }}>📅</div>
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5 }}>Tarihler</div>
+                  <div style={{ marginTop: 4, color: 'var(--text-main)', fontWeight: 500 }}>
+                    {project.startDate || '-'} <br/> {project.endDate ? `Hedef: ${project.endDate}` : ''}
+                  </div>
+                </div>
+                <div style={{ background: 'var(--bg-card)', padding: 16, borderRadius: 12, border: '1px solid var(--border-color)' }}>
+                  <div style={{ fontSize: 20, marginBottom: 8 }}>📝</div>
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5 }}>Notlar</div>
+                  <div style={{ marginTop: 4, color: 'var(--text-main)', fontSize: 13, maxHeight: 60, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {project.notes || 'Not yok.'}
+                  </div>
+                </div>
+              </div>
+
+              {/* DRIVE FOLDER SYSTEM */}
+              <div style={{ background: 'var(--bg-card)', borderRadius: 16, border: '1px solid var(--border-color)', overflow: 'hidden' }}>
+                <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-surface)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <span style={{ fontSize: 24 }}>📁</span>
+                    <h3 style={{ margin: 0, color: 'var(--text-main)' }}>Proje Dosyaları</h3>
+                  </div>
+                  
+                  <div style={{ display: 'flex', gap: 12 }}>
+                    {!activeFolder ? (
+                       isManager && (
+                         <button onClick={createNewFolder} className="btn-secondary" style={{ padding: '6px 12px', fontSize: 13, borderRadius: 8 }}>
+                           ➕ Yeni Klasör
+                         </button>
+                       )
+                    ) : (
+                       isManager && (
+                         <label className="btn-primary" style={{ padding: '6px 12px', fontSize: 13, borderRadius: 8, cursor: 'pointer' }}>
+                           {uploadingProjectFile ? 'Yükleniyor...' : '📄 Dosya Yükle'}
+                           <input type="file" hidden onChange={uploadProjectFile} />
+                         </label>
+                       )
+                    )}
+                  </div>
+                </div>
+                
+                <div style={{ padding: 24 }}>
+                  {!activeFolder ? (
+                    // KÖK DİZİN (KLASÖRLER)
+                    <div>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 16 }}>
+                        {/* Tüm projelerde varsayılan 'Genel' klasörü gibi davranacak ana alan */}
+                        <div 
+                          onClick={() => setActiveFolder('Genel Dosyalar')}
+                          style={{ background: 'var(--bg-main)', border: '1px solid var(--border-color)', borderRadius: 12, padding: 20, textAlign: 'center', cursor: 'pointer', transition: 'all 0.2s' }}
+                          className="folder-card"
+                        >
+                          <div style={{ fontSize: 40, marginBottom: 8 }}>📁</div>
+                          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-main)' }}>Genel Dosyalar</div>
                         </div>
+
+                        {(project.projectFolders || []).map((folder, i) => (
+                          <div key={i} style={{ position: 'relative' }}>
+                            <div 
+                              onClick={() => setActiveFolder(folder)}
+                              style={{ background: 'var(--bg-main)', border: '1px solid var(--border-color)', borderRadius: 12, padding: 20, textAlign: 'center', cursor: 'pointer', transition: 'all 0.2s' }}
+                              className="folder-card"
+                            >
+                              <div style={{ fontSize: 40, marginBottom: 8 }}>📂</div>
+                              <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-main)' }}>{folder}</div>
+                            </div>
+                            {isManager && (
+                              <button 
+                                onClick={() => deleteFolder(folder)}
+                                style={{ position: 'absolute', top: -8, right: -8, background: '#ef4444', color: 'white', border: 'none', borderRadius: '50%', width: 24, height: 24, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: 12, boxShadow: '0 2px 4px rgba(0,0,0,0.2)' }}
+                                title="Klasörü Sil"
+                              >✕</button>
+                            )}
+                          </div>
+                        ))}
                       </div>
-                    ))
+                    </div>
+                  ) : (
+                    // KLASÖR İÇİ (DOSYALAR)
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20, paddingBottom: 16, borderBottom: '1px dashed var(--border-color)' }}>
+                        <button onClick={() => setActiveFolder(null)} style={{ background: 'transparent', border: 'none', color: 'var(--primary-color)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, fontWeight: 600, padding: 0 }}>
+                          <ArrowLeft size={16} /> Klasörler
+                        </button>
+                        <span style={{ color: 'var(--text-muted)' }}>/</span>
+                        <span style={{ color: 'var(--text-main)', fontWeight: 600 }}>{activeFolder}</span>
+                      </div>
+
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                        {(() => {
+                          const filesInView = (project.projectFiles || []).filter(f => 
+                            (activeFolder === 'Genel Dosyalar' && (!f.folder || f.folder === 'Genel Dosyalar')) || 
+                            f.folder === activeFolder
+                          );
+
+                          if (filesInView.length === 0) {
+                            return <div style={{ padding: 32, textAlign: 'center', color: 'var(--text-muted)' }}>Bu klasör boş.</div>;
+                          }
+
+                          return filesInView.map((f, i) => (
+                            <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-main)', padding: '12px 16px', borderRadius: 8, border: '1px solid var(--border-color)' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 12, overflow: 'hidden' }}>
+                                <span style={{ fontSize: 20 }}>📄</span>
+                                <span style={{ fontSize: 14, color: 'var(--text-main)', fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '200px' }} title={f.name}>{f.name}</span>
+                              </div>
+                              <div style={{ display: 'flex', gap: 8 }}>
+                                <a href={f.url} target="_blank" rel="noreferrer" className="btn-primary" style={{ padding: '6px 16px', textDecoration: 'none', fontSize: 12, borderRadius: 6 }}>Aç</a>
+                                {isManager && (
+                                  <button className="btn-danger" style={{ padding: '6px 12px', fontSize: 12, borderRadius: 6 }} onClick={async () => {
+                                    if (window.confirm('Dosyayı silmek istediğinize emin misiniz?')) {
+                                      const updatedFiles = project.projectFiles.filter(pf => pf.url !== f.url);
+                                      await updateDoc(doc(db, 'projects', projectId), { projectFiles: updatedFiles });
+                                      fetchProject();
+                                    }
+                                  }}>Sil</button>
+                                )}
+                              </div>
+                            </div>
+                          ));
+                        })()}
+                      </div>
+                    </div>
                   )}
                 </div>
               </div>
 
-              <div className="modal-actions">
-                <button className="btn-primary" onClick={saveProjectInfo}>Kaydet</button>
-                <button className="btn-secondary" onClick={() => setEditingInfo(false)}>İptal</button>
-              </div>
             </div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                {/* İlerleme */}
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 18px', borderRadius: 10, background: 'var(--bg-card)', border: '1px solid var(--border-color)' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <span style={{ fontSize: 18 }}>📊</span>
-                    <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-main)' }}>İlerleme</span>
-                    <span className={`status-label ${project.status?.toLowerCase().replace(' ', '') || 'devamediyor'}`} style={{ fontSize: 11, padding: '2px 8px' }}>{project.status?.toUpperCase() || 'DEVAM EDİYOR'}</span>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                    <div style={{ width: 120, height: 6, background: 'var(--bg-secondary)', borderRadius: 3, overflow: 'hidden' }}>
-                      <div style={{ width: `${project.progress || 0}%`, height: '100%', background: 'var(--primary-color)', borderRadius: 3, transition: '0.3s' }} />
-                    </div>
-                    <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--primary-color)' }}>%{project.progress || 0}</span>
-                  </div>
-                </div>
-
-                {/* Açıklama */}
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 18px', borderRadius: 10, background: 'var(--bg-card)', border: '1px solid var(--border-color)' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <span style={{ fontSize: 18 }}>📋</span>
-                    <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>Açıklama</span>
-                  </div>
-                  <span style={{ fontSize: 14, color: 'var(--text-main)', fontWeight: 500 }}>{project.description || '-'}</span>
-                </div>
-
-                {/* Adres */}
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 18px', borderRadius: 10, background: 'var(--bg-card)', border: '1px solid var(--border-color)' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <span style={{ fontSize: 18 }}>📍</span>
-                    <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>Adres</span>
-                  </div>
-                  <span style={{ fontSize: 14, color: 'var(--text-main)', fontWeight: 500 }}>{project.address || '-'}</span>
-                </div>
-
-                {/* Tarih */}
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 18px', borderRadius: 10, background: 'var(--bg-card)', border: '1px solid var(--border-color)' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <span style={{ fontSize: 18 }}>📅</span>
-                    <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>Başlangıç</span>
-                  </div>
-                  <span style={{ fontSize: 14, color: 'var(--text-main)', fontWeight: 500 }}>{project.startDate || '-'}</span>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 18px', borderRadius: 10, background: 'var(--bg-card)', border: '1px solid var(--border-color)' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <span style={{ fontSize: 18 }}>🏁</span>
-                    <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>Hedef Bitiş</span>
-                  </div>
-                  <span style={{ fontSize: 14, color: 'var(--text-main)', fontWeight: 500 }}>{project.endDate || '-'}</span>
-                </div>
-
-                {/* Notlar */}
-                <div style={{ padding: '14px 18px', borderRadius: 10, background: 'var(--bg-card)', border: '1px solid var(--border-color)' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
-                    <span style={{ fontSize: 18 }}>📝</span>
-                    <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-muted)' }}>Notlar</span>
-                  </div>
-                  <p style={{ fontSize: 14, color: 'var(--text-main)', lineHeight: 1.6, whiteSpace: 'pre-wrap', margin: 0 }}>{project.notes || 'Henüz not eklenmemiş.'}</p>
-                </div>
-
-                {/* Dosyalar */}
-                <div style={{ padding: '14px 18px', borderRadius: 10, background: 'var(--bg-card)', border: '1px solid var(--border-color)' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <span style={{ fontSize: 18 }}>📁</span>
-                      <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-muted)' }}>Proje Dosyaları</span>
-                    </div>
-                    {isManager && (
-                      <label style={{ padding: '4px 12px', fontSize: 12, borderRadius: 6, cursor: 'pointer', background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', color: 'var(--text-main)', fontWeight: 600 }}>
-                        {uploadingProjectFile ? '...' : '+ Dosya'}
-                        <input type="file" hidden onChange={uploadProjectFile} />
-                      </label>
-                    )}
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                    {(project.projectFiles || []).length === 0 ? (
-                      <p style={{ fontSize: 13, color: 'var(--text-muted)', margin: 0 }}>Henüz dosya yüklenmemiş.</p>
-                    ) : (
-                      project.projectFiles.map((f, i) => (
-                        <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-main)', padding: '8px 12px', borderRadius: 6, border: '1px solid var(--border-color)' }}>
-                          <span style={{ fontSize: 13, color: 'var(--text-main)', wordBreak: 'break-all' }}>{f.name}</span>
-                          <div style={{ display: 'flex', gap: 6 }}>
-                            <a href={f.url} target="_blank" rel="noreferrer" style={{ padding: '4px 10px', textDecoration: 'none', fontSize: 11, background: 'var(--primary-color)', color: '#fff', borderRadius: 4 }}>İndir</a>
-                            {isManager && (
-                              <button style={{ padding: '4px 10px', fontSize: 11, background: '#ef4444', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer' }} onClick={async () => {
-                                if (window.confirm('Dosyayı silmek istediğinize emin misiniz?')) {
-                                  const updatedFiles = project.projectFiles.filter((_, idx) => idx !== i);
-                                  await updateDoc(doc(db, 'projects', projectId), { projectFiles: updatedFiles });
-                                  fetchProject();
-                                }
-                              }}>Sil</button>
-                            )}
-                          </div>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                </div>
-              </div>
           )}
         </div>
       )}
