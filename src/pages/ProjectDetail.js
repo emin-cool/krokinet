@@ -423,26 +423,28 @@ export default function ProjectDetail() {
         </div>
       </div>
 
-      <div className="detail-tabs">
-        <button className={activeTab === 'plan' ? 'tab active' : 'tab'} onClick={() => setActiveTab('plan')}>
-          <Ruler size={16} style={{ marginRight: '6px' }} /> Kat Planı
-        </button>
-        <button className={activeTab === 'info' ? 'tab active' : 'tab'}
-          onClick={() => setActiveTab('info')}>
-          <Info size={16} style={{ marginRight: '6px' }} /> Proje Bilgileri
-        </button>
-        <button className={activeTab === 'schedule' ? 'tab active' : 'tab'} onClick={() => setActiveTab('schedule')}>
-          <CalendarDays size={16} style={{ marginRight: '6px' }} /> İş Programı
-        </button>
-        <button className={activeTab === 'team' ? 'tab active' : 'tab'} onClick={() => setActiveTab('team')}>
-          <Users size={16} style={{ marginRight: '6px' }} /> Ekip
-        </button>
-        {isManager && (
-          <button className={activeTab === 'archive' ? 'tab active' : 'tab'} onClick={() => setActiveTab('archive')}>
-            <Archive size={16} style={{ marginRight: '6px' }} /> Arşiv
+      <div className="project-content-layout" style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
+        <div className="detail-tabs vertical-tabs" style={{ width: '220px', borderRight: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', padding: '24px 16px', gap: '12px', background: 'var(--bg-surface)' }}>
+          <button className={activeTab === 'plan' ? 'tab active' : 'tab'} onClick={() => setActiveTab('plan')} style={{ justifyContent: 'flex-start', padding: '12px 16px', borderRadius: '12px', border: 'none', background: activeTab === 'plan' ? 'var(--primary-color)' : 'transparent', color: activeTab === 'plan' ? '#fff' : 'var(--text-secondary)', fontWeight: 600 }}>
+            <Ruler size={18} style={{ marginRight: '12px' }} /> Kat Planı
           </button>
-        )}
-      </div>
+          <button className={activeTab === 'info' ? 'tab active' : 'tab'} onClick={() => setActiveTab('info')} style={{ justifyContent: 'flex-start', padding: '12px 16px', borderRadius: '12px', border: 'none', background: activeTab === 'info' ? 'var(--primary-color)' : 'transparent', color: activeTab === 'info' ? '#fff' : 'var(--text-secondary)', fontWeight: 600 }}>
+            <Info size={18} style={{ marginRight: '12px' }} /> Proje Bilgileri
+          </button>
+          <button className={activeTab === 'schedule' ? 'tab active' : 'tab'} onClick={() => setActiveTab('schedule')} style={{ justifyContent: 'flex-start', padding: '12px 16px', borderRadius: '12px', border: 'none', background: activeTab === 'schedule' ? 'var(--primary-color)' : 'transparent', color: activeTab === 'schedule' ? '#fff' : 'var(--text-secondary)', fontWeight: 600 }}>
+            <CalendarDays size={18} style={{ marginRight: '12px' }} /> İş Programı
+          </button>
+          <button className={activeTab === 'team' ? 'tab active' : 'tab'} onClick={() => setActiveTab('team')} style={{ justifyContent: 'flex-start', padding: '12px 16px', borderRadius: '12px', border: 'none', background: activeTab === 'team' ? 'var(--primary-color)' : 'transparent', color: activeTab === 'team' ? '#fff' : 'var(--text-secondary)', fontWeight: 600 }}>
+            <Users size={18} style={{ marginRight: '12px' }} /> Ekip
+          </button>
+          {isManager && (
+            <button className={activeTab === 'archive' ? 'tab active' : 'tab'} onClick={() => setActiveTab('archive')} style={{ justifyContent: 'flex-start', padding: '12px 16px', borderRadius: '12px', border: 'none', background: activeTab === 'archive' ? 'var(--primary-color)' : 'transparent', color: activeTab === 'archive' ? '#fff' : 'var(--text-secondary)', fontWeight: 600 }}>
+              <Archive size={18} style={{ marginRight: '12px' }} /> Arşiv
+            </button>
+          )}
+        </div>
+        
+        <div className="tab-content-area" style={{ flex: 1, overflowY: 'auto', position: 'relative' }}>
 
       {activeTab === 'plan' && (
         <div className="plan-view">
@@ -927,9 +929,18 @@ export default function ProjectDetail() {
       )}
 
       {activeTab === 'team' && <ProjectTeam projectId={projectId} isManager={canManageTeam} />}
+      </div>
+      </div>
 
       {selectedPin && (
-        <PinDetailModal pin={selectedPin} projectId={projectId} isManager={isManager} onClose={() => setSelectedPin(null)} />
+        <PinDetailModal 
+          pin={selectedPin} 
+          pins={pins}
+          setSelectedPin={setSelectedPin}
+          projectId={projectId} 
+          isManager={isManager} 
+          onClose={() => setSelectedPin(null)} 
+        />
       )}
     </div>
   );

@@ -1,10 +1,9 @@
-/* eslint-disable no-unused-vars, react-hooks/exhaustive-deps */
 import React, { useState } from 'react';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '../firebase';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext';
-import { Building } from 'lucide-react';
+import { User, Lock, ArrowRight, Fingerprint, Activity } from 'lucide-react';
+import './Login.css';
 
 export default function Login() {
   const [username, setUsername] = useState('');
@@ -48,35 +47,114 @@ export default function Login() {
   }
 
   return (
-    <div className="login-container">
-      <div className="login-box">
-        <div className="login-logo" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px', gap: '12px' }}>
-          <div className="app-logo-container" style={{ width: '84px', height: '84px', borderRadius: '22px', boxShadow: '0 8px 24px rgba(99, 102, 241, 0.35)' }}>
-            <img src="/logo.png" alt="Yapı Chat Logo" />
+    <div className="login-wrapper">
+      {/* Split Screen Container */}
+      <div className="login-split">
+        
+        {/* Left Side (Image & Brand - Desktop Only) */}
+        <div className="login-brand-panel">
+          <div className="login-brand-overlay"></div>
+          <div className="login-brand-content">
+            <div className="brand-logo-text">
+              <Activity size={32} /> Santi
+            </div>
+            <h1 className="brand-slogan">Projelerinizi<br/>Sahadan Yönetin.</h1>
+            <p className="brand-desc">
+              Modern şantiyeler için tasarlanmış, mimari hassasiyet ve saha uygulamasını birleştiren yüksek performanslı yönetim platformu.
+            </p>
+            
+            <div className="brand-stats">
+              <div>
+                <h2>500+</h2>
+                <span>AKTİF PROJE</span>
+              </div>
+              <div>
+                <h2>%99.9</h2>
+                <span>UPTIME</span>
+              </div>
+            </div>
           </div>
-          <h1 className="app-logo-text">Yapı Chat</h1>
         </div>
-        <p>Hesabınıza giriş yapın</p>
-        {error && <div className="error-msg">{error}</div>}
-        {isLockedOut && <div className="error-msg">{lockoutSeconds} saniye sonra tekrar deneyebilirsiniz.</div>}
-        <form onSubmit={handleSubmit}>
-          <input
-            placeholder="Kullanıcı Adı"
-            value={username}
-            onChange={e => setUsername(e.target.value)}
-            required
-          />
-          <input
-            type="password"
-            placeholder="Şifre"
-            value={password}
-            onChange={e => setPassword(e.target.value)}
-            required
-          />
-          <button type="submit" disabled={loading || isLockedOut}>
-            {isLockedOut ? `Kilitlendi (${lockoutSeconds}s)` : loading ? 'Giriş yapılıyor...' : 'Giriş Yap'}
-          </button>
-        </form>
+
+        {/* Right Side (Form) */}
+        <div className="login-form-panel">
+          <div className="login-form-container">
+            {/* Mobile Logo */}
+            <div className="mobile-logo-wrapper">
+              <div className="mobile-logo-icon">
+                <Activity size={24} color="#fff" />
+              </div>
+              <h2>Santi</h2>
+            </div>
+
+            <div className="login-header">
+              <h2>Sisteme Giriş</h2>
+              <p>Lütfen kimlik bilgilerinizi girin.</p>
+            </div>
+
+            {error && <div className="error-msg">{error}</div>}
+            {isLockedOut && <div className="error-msg">{lockoutSeconds} saniye sonra tekrar deneyebilirsiniz.</div>}
+
+            <form onSubmit={handleSubmit} className="santi-form">
+              <div className="input-group">
+                <label>Kullanıcı Adı</label>
+                <div className="input-with-icon">
+                  <User size={18} className="input-icon" />
+                  <input
+                    type="text"
+                    placeholder="kullanici.adi"
+                    value={username}
+                    onChange={e => setUsername(e.target.value)}
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="input-group">
+                <label>Şifre</label>
+                <div className="input-with-icon">
+                  <Lock size={18} className="input-icon" />
+                  <input
+                    type="password"
+                    placeholder="••••••••"
+                    value={password}
+                    onChange={e => setPassword(e.target.value)}
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="form-options">
+                <label className="checkbox-label">
+                  <input type="checkbox" />
+                  <span>Beni Hatırla</span>
+                </label>
+                <a href="#" className="forgot-password">Şifremi Unuttum</a>
+              </div>
+
+              <button type="submit" className="btn-login" disabled={loading || isLockedOut}>
+                {isLockedOut ? `Kilitlendi (${lockoutSeconds}s)` : loading ? 'Giriş yapılıyor...' : (
+                  <>Giriş Yap <ArrowRight size={18} /></>
+                )}
+              </button>
+
+              {/* Mobile Only Biometric */}
+              <div className="mobile-biometric">
+                <div className="divider"><span>VEYA</span></div>
+                <button type="button" className="btn-biometric">
+                  <Fingerprint size={32} />
+                  <span>Biyometrik Giriş</span>
+                </button>
+              </div>
+
+            </form>
+
+            <p className="support-text">
+              Sisteme erişimde sorun mu yaşıyorsunuz? <a href="#">Destek ile iletişime geçin.</a>
+            </p>
+          </div>
+        </div>
+
       </div>
     </div>
   );
