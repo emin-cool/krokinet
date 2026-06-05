@@ -446,12 +446,13 @@ export default function ProjectDetail() {
 
       {activeTab === 'plan' && (
         <div className="plan-view">
-          <div className="floor-tabs" style={{ marginTop: 16 }}>
+          {/* Stitch-style floor tabs - pill menu */}
+          <div className="floor-tabs">
             {floorPlans.map((fp, i) => {
               if (fp.isArchived) return null;
               return (
               <div key={i} className="floor-tab-wrapper">
-                <button className={activeFloor === i ? 'floor-tab active' : 'floor-tab'} onClick={() => setActiveFloor(i)} style={{ opacity: fp.isArchived ? 0.6 : 1, filter: fp.isArchived ? 'grayscale(100%)' : 'none' }}>
+                <button className={activeFloor === i ? 'floor-tab active' : 'floor-tab'} onClick={() => setActiveFloor(i)}>
                   {editingFloorIndex === i ? (
                     <input
                       className="floor-tab-input"
@@ -463,32 +464,33 @@ export default function ProjectDetail() {
                         if (e.key === 'Escape') setEditingFloorIndex(null);
                       }}
                       autoFocus
+                      style={{ background: 'transparent', border: 'none', outline: 'none', color: 'inherit', fontSize: 'inherit', fontWeight: 'inherit', width: 80, textAlign: 'center' }}
                     />
                   ) : (
                     <span onDoubleClick={() => isManager && setEditingFloorIndex(i)}>
-                      {fp.name} {fp.isArchived && '(Arşiv)'}
+                      {fp.name}
                     </span>
                   )}
                 </button>
                 {isManager && (
-                  <div style={{ display: 'flex' }}>
-                    <button className="floor-tab-delete" onClick={() => toggleArchiveFloorPlan(i, fp.isArchived)} style={{ color: '#4b5563', padding: '0 4px' }} title={fp.isArchived ? 'Arşivden Çıkar' : 'Arşivle'}>
+                  <div style={{ display: 'flex', gap: 2 }}>
+                    <button className="floor-tab-delete" onClick={() => toggleArchiveFloorPlan(i, fp.isArchived)} style={{ color: '#4b5563', padding: '0 4px', fontSize: 10 }} title={fp.isArchived ? 'Arşivden Çıkar' : 'Arşivle'}>
                       📦
                     </button>
-                    <button className="floor-tab-delete" onClick={() => deleteFloorPlan(i, fp.name)}>X</button>
+                    <button className="floor-tab-delete" onClick={() => deleteFloorPlan(i, fp.name)} style={{ fontSize: 10 }}>✕</button>
                   </div>
                 )}
               </div>
             )})}
             {isManager && (
               <>
-                <button className="btn-primary desktop-new-pin-btn" onClick={() => setAddingPin(!addingPin)} style={{ padding: '6px 14px', fontSize: 12, borderRadius: 8 }}>
+                <button className="btn-primary desktop-new-pin-btn" onClick={() => setAddingPin(!addingPin)} style={{ padding: '6px 14px', fontSize: 12, borderRadius: 9999 }}>
                   {addingPin ? '✕' : '📍 Pin'}
                 </button>
                 <button className="fab-button" onClick={() => setAddingPin(!addingPin)}>
                   {addingPin ? '✕' : '+'}
                 </button>
-                <label style={{ padding: '6px 14px', fontSize: 12, borderRadius: 8, cursor: 'pointer', background: 'var(--bg-card)', border: '1px solid var(--border-color)', color: 'var(--text-main)', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' }} className="hide-on-mobile">
+                <label style={{ padding: '6px 14px', fontSize: 12, borderRadius: 9999, cursor: 'pointer', background: 'var(--bg-card)', border: '1px solid var(--border-color)', color: 'var(--text-main)', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' }} className="hide-on-mobile">
                   {uploadingPlan ? '...' : '🗺️ Plan'}
                   <input type="file" hidden accept="image/*,.pdf" onChange={uploadFloorPlan} />
                 </label>
@@ -520,40 +522,43 @@ export default function ProjectDetail() {
           )}
 
           {floorPlans.length === 0 ? (
-            <div className="empty-state">Henüz kat planı yüklenmemiş.</div>
+            <div className="empty-state" style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>Henüz kat planı yüklenmemiş.</div>
           ) : (
-            <div style={{ borderRadius: '12px', overflow: 'hidden', border: '1px solid var(--border-color)', position: 'relative' }}>
-              <div style={{ display: 'flex', gap: 8, padding: '10px 16px', alignItems: 'center', background: 'var(--bg-secondary)', borderBottom: '1px solid var(--border-color)', flexWrap: 'wrap' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <div style={{ flex: 1, overflow: 'hidden', position: 'relative' }}>
+              {/* Stitch-style glassmorphism category overlay */}
+              <div className="plan-header-overlay">
+                <div className="plan-category-pills">
                   <button 
-                    onClick={() => { const el = document.getElementById('pin-search-input'); if(el) { el.style.display = el.style.display === 'none' ? 'block' : 'none'; if(el.style.display === 'block') el.focus(); } }}
-                    style={{ background: 'none', border: '1px solid var(--border-color)', borderRadius: 8, padding: '6px 8px', cursor: 'pointer', color: 'var(--text-muted)', fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                    title="Pin Ara"
-                  >🔍</button>
-                  <input 
-                    id="pin-search-input"
-                    placeholder="Ara..." 
-                    value={pinSearch} 
-                    onChange={e => setPinSearch(e.target.value)}
-                    style={{ display: pinSearch ? 'block' : 'none', padding: '6px 10px', borderRadius: 6, border: '1px solid var(--border-color)', background: 'var(--bg-main)', color: 'var(--text-main)', width: 120, fontSize: 13 }}
-                  />
-                </div>
-                <div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 4, flex: 1, WebkitOverflowScrolling: 'touch', msOverflowStyle: 'none', scrollbarWidth: 'none' }} className="hide-scrollbar">
-                  <button 
+                    className={`category-pill ${categoryFilter === 'all' ? 'active' : ''}`}
                     onClick={() => setCategoryFilter('all')}
-                    style={{ padding: '5px 14px', borderRadius: 20, border: categoryFilter === 'all' ? '2px solid #3b82f6' : '1px solid rgba(59,130,246,0.3)', background: 'rgba(59,130,246,0.15)', color: '#3b82f6', fontSize: 12, fontWeight: 700, whiteSpace: 'nowrap', cursor: 'pointer', transition: '0.2s', opacity: categoryFilter === 'all' ? 1 : 0.6 }}
+                    style={{ borderColor: '#3b82f6', background: categoryFilter === 'all' ? '#3b82f6' : 'rgba(59,130,246,0.1)', color: categoryFilter === 'all' ? '#fff' : '#3b82f6' }}
                   >
-                    Genel
+                    Tümü
                   </button>
                   {CATEGORIES.map(c => (
                     <button 
                       key={c}
+                      className={`category-pill ${categoryFilter === c ? 'active' : ''}`}
                       onClick={() => setCategoryFilter(c)}
-                      style={{ padding: '5px 14px', borderRadius: 20, border: categoryFilter === c ? `2px solid ${CATEGORY_COLORS[c]}` : `1px solid ${CATEGORY_COLORS[c]}40`, background: `${CATEGORY_COLORS[c]}20`, color: CATEGORY_COLORS[c], fontSize: 12, fontWeight: 700, whiteSpace: 'nowrap', cursor: 'pointer', transition: '0.2s', textTransform: 'capitalize', opacity: categoryFilter === c ? 1 : 0.6 }}
+                      style={{ borderColor: CATEGORY_COLORS[c], background: categoryFilter === c ? CATEGORY_COLORS[c] : `${CATEGORY_COLORS[c]}15`, color: categoryFilter === c ? '#fff' : CATEGORY_COLORS[c] }}
                     >
                       {c}
                     </button>
                   ))}
+                  <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                    <button 
+                      onClick={() => { const el = document.getElementById('pin-search-input'); if(el) { el.style.display = el.style.display === 'none' ? 'block' : 'none'; if(el.style.display === 'block') el.focus(); } }}
+                      style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 9999, padding: '5px 10px', cursor: 'pointer', color: 'var(--text-muted)', fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                      title="Pin Ara"
+                    >🔍</button>
+                    <input 
+                      id="pin-search-input"
+                      placeholder="Pin ara..." 
+                      value={pinSearch} 
+                      onChange={e => setPinSearch(e.target.value)}
+                      style={{ display: pinSearch ? 'block' : 'none', padding: '5px 10px', borderRadius: 9999, border: '1px solid var(--border-color)', background: 'var(--bg-card)', color: 'var(--text-main)', width: 120, fontSize: 12 }}
+                    />
+                  </div>
                 </div>
               </div>
 
@@ -579,7 +584,7 @@ export default function ProjectDetail() {
                       <button className="zoom-btn" onClick={() => resetTransform()}>⟲</button>
                       <button className="zoom-btn" onClick={() => setMapRotation(prev => (prev + 90) % 360)} title="Döndür">↻</button>
                     </div>
-                    <TransformComponent wrapperStyle={{ width: "100%", height: "70vh", backgroundColor: "var(--bg-main)", cursor: (addingPin && !newPinCoords) ? 'crosshair' : 'grab' }}>
+                    <TransformComponent wrapperStyle={{ width: "100%", height: "100%", backgroundColor: "var(--bg-main)", cursor: (addingPin && !newPinCoords) ? 'crosshair' : 'grab' }}>
                       <div
                         className={`floor-plan-wrapper ${addingPin && !newPinCoords ? 'crosshair' : ''}`}
                         onClick={handleImageClick}
@@ -607,9 +612,8 @@ export default function ProjectDetail() {
                                 filter: pin.isArchived ? 'grayscale(100%)' : 'none',
                                 cursor: movingPinId === pin.id ? (isDragging ? 'grabbing' : 'grab') : 'pointer',
                                 zIndex: isDragging ? 1000 : 10,
-                                animation: movingPinId === pin.id && !isDragging ? 'pulse 1s infinite' : 'none',
-                                boxShadow: movingPinId === pin.id ? '0 0 0 4px rgba(59,130,246,0.6)' : undefined,
-                                transform: `translate(-50%, -100%) rotate(${-45 - mapRotation}deg)`
+                                boxShadow: movingPinId === pin.id ? '0 0 0 4px rgba(59,130,246,0.6)' : '0 2px 8px rgba(0,0,0,0.3)',
+                                transform: `translate(-50%, -50%) rotate(${-mapRotation}deg)`
                               }}
                               onMouseDown={e => handlePinPointerDown(e, pin)}
                               onTouchStart={e => handlePinPointerDown(e, pin)}
@@ -639,7 +643,7 @@ export default function ProjectDetail() {
                           );
                         })}
                         {newPinCoords && (
-                          <div className="pin-marker-custom" style={{ left: `${newPinCoords.x}%`, top: `${newPinCoords.y}%`, background: newPinData.color, transform: `translate(-50%, -100%) rotate(${-45 - mapRotation}deg)` }}>
+                          <div className="pin-marker-custom" style={{ left: `${newPinCoords.x}%`, top: `${newPinCoords.y}%`, background: newPinData.color, transform: `translate(-50%, -50%) rotate(${-mapRotation}deg)` }}>
                             <div className="pin-tooltip">Yeni Pin</div>
                           </div>
                         )}

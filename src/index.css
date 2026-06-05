@@ -867,53 +867,66 @@ p {
    FLOOR PLAN
    â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 .plan-view {
-  padding: 32px 40px;
+  padding: 0;
+  position: relative;
+  height: calc(100vh - 120px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--bg-main);
 }
 
 .floor-tabs {
   display: flex;
-  gap: 10px;
-  margin-bottom: 24px;
-  flex-wrap: wrap;
+  gap: 8px;
+  padding: 12px 16px;
+  overflow-x: auto;
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+  flex-shrink: 0;
+  align-items: center;
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border-color);
+}
+.floor-tabs::-webkit-scrollbar {
+  display: none;
 }
 
 .floor-tab-wrapper {
   display: flex;
   align-items: center;
-  gap: 4px;
-  background: var(--bg-card);
-  border-radius: var(--radius-md);
-  padding: 3px 6px;
-  border: 1px solid var(--border-color);
-  transition: border-color var(--transition-normal);
+  gap: 2px;
+  flex-shrink: 0;
 }
 
-.floor-tab-wrapper:hover {
-  border-color: var(--border-hover);
+.floor-tab-wrapper:hover .floor-tab {
+  color: var(--text-main);
 }
 
 .floor-tab {
-  padding: 10px 20px;
-  border: none;
-  background: transparent;
-  border-radius: var(--radius-sm);
+  padding: 8px 20px;
+  border: 1.5px solid var(--border-color);
+  background: var(--bg-card);
+  border-radius: 9999px;
   cursor: pointer;
   font-size: 0.8125rem;
   font-weight: 600;
   color: var(--text-muted);
   font-family: inherit;
   transition: all var(--transition-normal);
+  white-space: nowrap;
 }
 
 .floor-tab:hover {
   color: var(--text-main);
-  background: var(--bg-card-hover);
+  border-color: var(--primary-color);
 }
 
 .floor-tab.active {
-  background: var(--primary-glow);
-  color: var(--primary-color);
-  box-shadow: var(--shadow-xs);
+  background: var(--primary-color);
+  color: #fff;
+  border-color: var(--primary-color);
+  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.35);
 }
 
 .floor-tab-delete {
@@ -976,6 +989,86 @@ p {
   padding: 10px 18px;
   border-radius: var(--radius-sm);
   border: 1px solid rgba(99, 102, 241, 0.15);
+}
+
+/* Stitch-inspired fullscreen plan header */
+.plan-header-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 40;
+  padding: 12px 16px;
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.6);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+[data-theme="dark"] .plan-header-overlay {
+  background: rgba(20, 24, 41, 0.85);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.plan-project-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.plan-project-info h3 {
+  font-size: 1rem;
+  font-weight: 700;
+  margin: 0;
+  color: var(--text-main);
+}
+
+.plan-project-info p {
+  font-size: 0.75rem;
+  margin: 0;
+  color: var(--text-muted);
+}
+
+.plan-category-pills {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+  padding-bottom: 4px;
+}
+
+.plan-category-pills::-webkit-scrollbar {
+  display: none;
+}
+
+.category-pill {
+  padding: 5px 14px;
+  border-radius: 9999px;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-transform: capitalize;
+  border: 1.5px solid;
+  flex-shrink: 0;
+}
+
+.category-pill.active {
+  opacity: 1;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+}
+
+.category-pill:not(.active) {
+  opacity: 0.6;
+}
+
+.category-pill:hover {
+  opacity: 1;
 }
 
 .floor-plan-wrapper {
@@ -2260,9 +2353,35 @@ p {
   font-weight: bold;
 }
 
-/* 2. FAB */
+/* 2. FAB - Stitch Style */
 .fab-button {
-  display: none !important;
+  display: none;
+  position: fixed;
+  bottom: 80px;
+  right: 20px;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--primary-color);
+  color: #fff;
+  border: none;
+  font-size: 28px;
+  font-weight: 300;
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(99, 102, 241, 0.4), 0 2px 4px rgba(0, 0, 0, 0.1);
+  z-index: 200;
+  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  align-items: center;
+  justify-content: center;
+}
+
+.fab-button:hover {
+  transform: scale(1.08);
+  box-shadow: 0 6px 24px rgba(99, 102, 241, 0.5);
+}
+
+.fab-button:active {
+  transform: scale(0.95);
 }
 
 /* 3. Bottom Sheet Modal */
@@ -2309,28 +2428,7 @@ p {
   }
 
   .fab-button {
-    display: flex !important;
-    position: fixed;
-    bottom: 85px;
-    right: 20px;
-    width: 56px;
-    height: 56px;
-    border-radius: var(--radius-full);
-    background: var(--primary-gradient);
-    color: white;
-    box-shadow: 0 4px 20px rgba(99, 102, 241, 0.4);
-    align-items: center;
-    justify-content: center;
-    z-index: 990;
-    border: none;
-    cursor: pointer;
-    font-size: 24px;
-    font-weight: 400;
-    transition: all var(--transition-normal);
-  }
-
-  .fab-button:active {
-    transform: scale(0.95);
+    display: flex;
   }
 
   .desktop-new-pin-btn {
@@ -2378,7 +2476,7 @@ p {
 /* Hide on keyboard open */
 @media (max-height: 600px) and (max-width: 768px) {
   .bottom-nav { display: none !important; }
-  .fab-button { display: none !important; }
+  .fab-button { display: flex; }
   body { padding-bottom: 0 !important; }
   .modal-content, .pin-modal, .team-modal { max-height: 95vh !important; }
 }
