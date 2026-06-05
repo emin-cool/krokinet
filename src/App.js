@@ -7,7 +7,11 @@ import ProjectDetail from './pages/ProjectDetail';
 import Profile from './pages/Profile';
 import NotificationsPage from './pages/NotificationsPage';
 import BottomNav from './components/BottomNav';
+import Layout from './components/Layout';
+import GlobalCalendar from './pages/GlobalCalendar';
+import MarketPrices from './pages/MarketPrices';
 import './index.css';
+import './layout.css';
 
 function PrivateRoute({ children }) {
   const { currentUser } = useAuth();
@@ -101,13 +105,14 @@ function AppRoutes() {
     <>
       <Routes>
         <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
-        <Route path="/" element={<PrivateRoute><Projects /></PrivateRoute>} />
-        <Route path="/profile" element={<PrivateRoute><Profile /></PrivateRoute>} />
-        <Route path="/project/:projectId" element={<PrivateRoute><ProjectDetail /></PrivateRoute>} />
-        <Route path="/notifications" element={<PrivateRoute><NotificationsPage /></PrivateRoute>} />
+        <Route path="/" element={<PrivateRoute><Layout><Projects /></Layout></PrivateRoute>} />
+        <Route path="/calendar" element={<PrivateRoute><Layout><GlobalCalendar /></Layout></PrivateRoute>} />
+        <Route path="/materials" element={<PrivateRoute><Layout><MarketPrices /></Layout></PrivateRoute>} />
+        <Route path="/profile" element={<PrivateRoute><Layout><Profile /></Layout></PrivateRoute>} />
+        <Route path="/project/:projectId" element={<PrivateRoute><Layout><ProjectDetail /></Layout></PrivateRoute>} />
+        <Route path="/notifications" element={<PrivateRoute><Layout><NotificationsPage /></Layout></PrivateRoute>} />
       </Routes>
       <ThemeToggle />
-      <BottomNav />
     </>
   );
 }

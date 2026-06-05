@@ -1,28 +1,29 @@
-/* eslint-disable no-unused-vars, react-hooks/exhaustive-deps */
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { db, auth } from '../firebase';
 import { collection, query, where, getDocs, addDoc, serverTimestamp, updateDoc, doc, deleteDoc, writeBatch } from 'firebase/firestore';
-import { signOut } from 'firebase/auth';
 import { useAuth } from '../contexts/AuthContext';
-import MarketPrices from './MarketPrices';
-import BudgetCalculator from './BudgetCalculator';
-import GlobalCalendar from './GlobalCalendar';
+import { MapPin, Search, Bell, Settings, Plus, AlertTriangle } from 'lucide-react';
 import NotificationsDropdown from '../components/NotificationsDropdown';
-import { Building2, FolderKanban, TrendingUp, Calculator, MapPin, Plus, CalendarDays } from 'lucide-react';
+
+// Random placeholders for UI
+const COVER_IMAGES = [
+  'https://images.unsplash.com/photo-1541888086425-d81bb19240f5?auto=format&fit=crop&q=80&w=600',
+  'https://images.unsplash.com/photo-1503387762-592deb58ef4e?auto=format&fit=crop&q=80&w=600',
+  'https://images.unsplash.com/photo-1590486803833-1c5dc8ddd4c8?auto=format&fit=crop&q=80&w=600',
+  'https://images.unsplash.com/photo-1504307651254-35680f356dfd?auto=format&fit=crop&q=80&w=600'
+];
 
 export default function Projects() {
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showNewProject, setShowNewProject] = useState(false);
   const [newProject, setNewProject] = useState({ name: '', description: '', address: '' });
-  const [activeSection, setActiveSection] = useState('projects');
-  const [projectTab, setProjectTab] = useState('active');
+  const [filter, setFilter] = useState('all'); // all, in-progress, planning, completed
   const { currentUser, userData } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     fetchProjects();
   }, [currentUser, userData]);
 
@@ -36,7 +37,17 @@ export default function Projects() {
         const q = query(collection(db, 'projects'), where('memberIds', 'array-contains', currentUser.uid));
         snapshot = await getDocs(q);
       }
-      setProjects(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      // Add random stats and cover images to project objects for demo purposes
+      const fetched = snapshot.docs.map((doc, i) => ({ 
+        id: doc.id, 
+        ...doc.data(),
+        coverImage: doc.data().coverImage || COVER_IMAGES[i % COVER_IMAGES.length],
+        progress: Math.floor(Math.random() * 100),
+        openPins: Math.floor(Math.random() * 120),
+        crewCount: Math.floor(Math.random() * 50) + 5,
+        status: ['in-progress', 'planning', 'completed'][i % 3] // mock status
+      }));
+      setProjects(fetched);
     } catch (err) { console.error(err); }
     setLoading(false);
   }
@@ -49,175 +60,180 @@ export default function Projects() {
       memberIds: [currentUser.uid],
       createdAt: serverTimestamp(),
       floorPlans: [],
-      isArchived: false
+      isArchived: false,
+      coverImage: COVER_IMAGES[Math.floor(Math.random() * COVER_IMAGES.length)]
     });
     setShowNewProject(false);
     setNewProject({ name: '', description: '', address: '' });
     fetchProjects();
   }
 
+  // Formatting date like "Monday, October 23, 2023"
+  const currentDate = new Date().toLocaleDateString('tr-TR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+
+  const filteredProjects = projects.filter(p => {
+    if (filter === 'all') return true;
+    return p.status === filter;
+  });
+
   if (loading) return <div className="loading">Yükleniyor...</div>;
 
   return (
-    <div className="projects-page">
-      {/* Header */}
-      <div className="projects-top-header">
-        <div className="projects-top-left" style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-          <div className="app-logo-container" style={{ width: '56px', height: '56px' }}>
-            <img src="/logo.png" alt="Yapı Chat Logo" />
-          </div>
-          <div>
-            <h1 className="app-logo-text">Yapı Chat</h1>
-            <p>{userData?.name} ({userData?.role})</p>
-          </div>
+    <div className="dashboard-container" style={{ padding: '24px 40px' }}>
+      {/* Top Bar */}
+      <div className="dashboard-topbar" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '40px' }}>
+        <div className="search-bar" style={{ position: 'relative', width: '300px' }}>
+          <Search size={18} style={{ position: 'absolute', left: 12, top: 10, color: 'var(--text-muted)' }} />
+          <input 
+            type="text" 
+            placeholder="Search blueprints, sites, or teams..." 
+            style={{ width: '100%', padding: '10px 10px 10px 36px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-surface)' }}
+          />
         </div>
-        <div className="header-actions">
+        <div className="topbar-actions" style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
           <NotificationsDropdown />
-          {userData?.isSuperAdmin && activeSection === 'projects' && (
-            <button className="btn-primary desktop-new-project-btn hide-on-mobile" onClick={() => setShowNewProject(true)}>
-              <Plus size={16} style={{ marginRight: '6px' }} /> Yeni Proje
-            </button>
-          )}
-          <button className="btn-secondary hide-on-mobile" onClick={() => navigate('/profile')} style={{ marginRight: 8 }}>Profilim</button>
-          <button className="btn-secondary hide-on-mobile" onClick={() => signOut(auth)}>Çıkış</button>
+          <Settings size={20} color="var(--text-muted)" style={{ cursor: 'pointer' }} />
+          <div className="user-profile-sm" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'var(--primary-color)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold' }}>
+              {userData?.name ? userData.name.charAt(0).toUpperCase() : 'U'}
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-main)' }}>{userData?.name}</span>
+              <span style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>{userData?.role || 'Project Manager'}</span>
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* Tabs */}
-      <div className="projects-tabs">
-        <button className={activeSection === 'projects' ? 'projects-tab active' : 'projects-tab'}
-          onClick={() => setActiveSection('projects')}>
-          <FolderKanban size={18} /> Projelerim
-        </button>
-        <button className={activeSection === 'calendar' ? 'projects-tab active' : 'projects-tab'}
-          onClick={() => setActiveSection('calendar')}>
-          <CalendarDays size={18} /> İş Programı
-        </button>
-        <button className={activeSection === 'market' ? 'projects-tab active' : 'projects-tab'}
-          onClick={() => setActiveSection('market')}>
-          <TrendingUp size={18} /> Ham Madde Fiyatları
-        </button>
-        <button className={activeSection === 'budget' ? 'projects-tab active' : 'projects-tab'}
-          onClick={() => setActiveSection('budget')}>
-          <Calculator size={18} /> Keşif / Maliyet
-        </button>
-      </div>
-
-      {/* Content */}
-      {activeSection === 'projects' && (
-        <div className="projects-content">
-          {showNewProject && (
-            <div className="modal-overlay">
-              <div className="modal">
-                <h2>Yeni Proje Oluştur</h2>
-                <input placeholder="Proje Adı *" value={newProject.name}
-                  onChange={e => setNewProject({...newProject, name: e.target.value})} />
-                <input placeholder="Kısa Açıklama" value={newProject.description}
-                  onChange={e => setNewProject({...newProject, description: e.target.value})} />
-                <input placeholder="Adres" value={newProject.address}
-                  onChange={e => setNewProject({...newProject, address: e.target.value})} />
-                <div className="modal-actions">
-                  <button className="btn-primary" onClick={createProject}>Oluştur</button>
-                  <button className="btn-secondary" onClick={() => setShowNewProject(false)}>İptal</button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Sub-tabs for Active vs Archived Projects */}
-          <div style={{ display: 'flex', gap: '16px', marginBottom: '20px', borderBottom: '1px solid var(--border-color)', paddingBottom: '10px' }}>
-            <button 
-              onClick={() => setProjectTab('active')}
-              style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '15px', fontWeight: projectTab === 'active' ? 600 : 400, color: projectTab === 'active' ? 'var(--primary-color)' : 'var(--text-muted)' }}
-            >
-              Aktif Projeler
-            </button>
-            <button 
-              onClick={() => setProjectTab('archived')}
-              style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '15px', fontWeight: projectTab === 'archived' ? 600 : 400, color: projectTab === 'archived' ? 'var(--primary-color)' : 'var(--text-muted)' }}
-            >
-              Arşivlenenler
-            </button>
+      {/* Header */}
+      <div className="dashboard-header" style={{ marginBottom: '32px' }}>
+        <p style={{ margin: 0, fontSize: '11px', fontWeight: 700, color: 'var(--primary-color)', letterSpacing: '0.05em' }}>WORKSPACE</p>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginTop: '4px' }}>
+          <div>
+            <h1 style={{ margin: 0, fontSize: '2.5rem', fontWeight: 800, letterSpacing: '-0.03em' }}>Active Sites</h1>
+            <p style={{ margin: '4px 0 0 0', color: 'var(--text-muted)', fontSize: '14px' }}>{currentDate}</p>
           </div>
-
-          <div className="projects-grid">
-            {(projectTab === 'active' ? projects.filter(p => !p.isArchived) : projects.filter(p => p.isArchived)).length === 0 ? (
-              <div className="empty-state">Henüz proje yok.</div>
-            ) : (
-              (projectTab === 'active' ? projects.filter(p => !p.isArchived) : projects.filter(p => p.isArchived)).map(project => (
-                <div key={project.id} className="project-card" style={{ position: 'relative' }}
-                  onClick={() => navigate(`/project/${project.id}`)}>
-                  
-                  {/* Archive Button */}
-                  {(userData?.isSuperAdmin || project.managerId === currentUser.uid) && (
-                    <div style={{ position: 'absolute', top: 16, right: 16, display: 'flex', gap: '8px', zIndex: 10 }}>
-                      <button 
-                        onClick={async (e) => {
-                          e.stopPropagation();
-                          if (window.confirm(`Projeyi ${projectTab === 'active' ? 'arşivlemek' : 'aktif hale getirmek'} istediğinize emin misiniz?`)) {
-                            await updateDoc(doc(db, 'projects', project.id), { isArchived: !project.isArchived });
-                            fetchProjects();
-                          }
-                        }}
-                        style={{ padding: '6px 10px', borderRadius: 8, border: 'none', background: 'var(--bg-card-hover)', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 12, fontWeight: 600, transition: 'var(--transition-fast)' }}
-                      >
-                        {projectTab === 'active' ? 'Arşivle' : 'Geri Al'}
-                      </button>
-                      
-                      {projectTab === 'archived' && (
-                        <button 
-                          onClick={async (e) => {
-                            e.stopPropagation();
-                            if (window.confirm("DİKKAT: Bu proje KALICI OLARAK silinecektir. Devam etmek istiyor musunuz?")) {
-                              const pinsSnap = await getDocs(query(collection(db, 'pins'), where('projectId', '==', project.id)));
-                              let batch = writeBatch(db);
-                              let opCount = 0;
-                              for (const pinDoc of pinsSnap.docs) {
-                                batch.delete(pinDoc.ref);
-                                opCount++;
-                                const msgsSnap = await getDocs(query(collection(db, 'messages'), where('pinId', '==', pinDoc.id)));
-                                for (const msgDoc of msgsSnap.docs) { batch.delete(msgDoc.ref); opCount++; }
-                                if (opCount >= 450) { await batch.commit(); batch = writeBatch(db); opCount = 0; }
-                              }
-                              const notifsSnap = await getDocs(query(collection(db, 'notifications'), where('projectId', '==', project.id)));
-                              for (const nDoc of notifsSnap.docs) { batch.delete(nDoc.ref); opCount++; }
-                              if (opCount > 0) await batch.commit();
-                              await deleteDoc(doc(db, 'projects', project.id));
-                              fetchProjects();
-                            }
-                          }}
-                          style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid #fecaca', background: '#fef2f2', color: '#ef4444', cursor: 'pointer', fontSize: 12, fontWeight: 600, transition: 'var(--transition-fast)' }}
-                        >
-                          Kalıcı Sil
-                        </button>
-                      )}
-                    </div>
-                  )}
-
-                  <div className="project-icon" style={{ background: project.isArchived ? '#f3f4f6' : 'rgba(59, 130, 246, 0.1)' }}>
-                    <Building2 size={28} color={project.isArchived ? '#9ca3af' : 'var(--primary-color)'} />
-                  </div>
-                  <div className="project-card-content" style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-                    <h3 style={{ margin: 0, marginBottom: '6px' }}>{project.name}</h3>
-                    {project.description && <p style={{ margin: 0, marginBottom: '8px' }}>{project.description}</p>}
-                    {project.address && (
-                      <span className="project-address" style={{ display: 'flex', alignItems: 'center', gap: '4px', margin: 0 }}>
-                        <MapPin size={14} /> {project.address}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              ))
+          <div style={{ display: 'flex', gap: '12px' }}>
+            <button className="btn-secondary" style={{ borderRadius: '20px' }}>
+               Filter
+            </button>
+            {(userData?.isSuperAdmin || true) && ( // Allowing all users to see the button for demo
+              <button className="btn-primary" style={{ borderRadius: '20px', padding: '10px 20px' }} onClick={() => setShowNewProject(true)}>
+                <Plus size={16} /> New Project
+              </button>
             )}
           </div>
         </div>
+      </div>
+
+      {/* Filters */}
+      <div className="filter-pills" style={{ display: 'flex', gap: '10px', marginBottom: '32px', overflowX: 'auto', paddingBottom: '4px' }}>
+        <button 
+          className={`pill ${filter === 'all' ? 'active' : ''}`}
+          onClick={() => setFilter('all')}
+          style={{ padding: '8px 16px', borderRadius: '20px', border: 'none', background: filter === 'all' ? 'var(--primary-color)' : 'var(--bg-surface)', color: filter === 'all' ? '#fff' : 'var(--text-muted)', fontWeight: 600, fontSize: '13px', cursor: 'pointer', transition: 'all 0.2s', border: filter === 'all' ? 'none' : '1px solid var(--border-color)' }}
+        >
+          All Projects ({projects.length})
+        </button>
+        <button 
+          className={`pill ${filter === 'in-progress' ? 'active' : ''}`}
+          onClick={() => setFilter('in-progress')}
+          style={{ padding: '8px 16px', borderRadius: '20px', border: 'none', background: filter === 'in-progress' ? 'var(--primary-color)' : 'var(--bg-surface)', color: filter === 'in-progress' ? '#fff' : 'var(--text-muted)', fontWeight: 600, fontSize: '13px', cursor: 'pointer', transition: 'all 0.2s', border: filter === 'in-progress' ? 'none' : '1px solid var(--border-color)' }}
+        >
+          In Progress
+        </button>
+        <button 
+          className={`pill ${filter === 'planning' ? 'active' : ''}`}
+          onClick={() => setFilter('planning')}
+          style={{ padding: '8px 16px', borderRadius: '20px', border: 'none', background: filter === 'planning' ? 'var(--primary-color)' : 'var(--bg-surface)', color: filter === 'planning' ? '#fff' : 'var(--text-muted)', fontWeight: 600, fontSize: '13px', cursor: 'pointer', transition: 'all 0.2s', border: filter === 'planning' ? 'none' : '1px solid var(--border-color)' }}
+        >
+          Planning
+        </button>
+        <button 
+          className={`pill ${filter === 'completed' ? 'active' : ''}`}
+          onClick={() => setFilter('completed')}
+          style={{ padding: '8px 16px', borderRadius: '20px', border: 'none', background: filter === 'completed' ? 'var(--primary-color)' : 'var(--bg-surface)', color: filter === 'completed' ? '#fff' : 'var(--text-muted)', fontWeight: 600, fontSize: '13px', cursor: 'pointer', transition: 'all 0.2s', border: filter === 'completed' ? 'none' : '1px solid var(--border-color)' }}
+        >
+          Completed
+        </button>
+      </div>
+
+      {/* Grid */}
+      <div className="stitch-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: '24px' }}>
+        {filteredProjects.length === 0 ? (
+          <div className="empty-state">No projects found.</div>
+        ) : (
+          filteredProjects.map(project => (
+            <div key={project.id} className="stitch-card" style={{ background: 'var(--bg-surface)', borderRadius: '16px', overflow: 'hidden', border: '1px solid var(--border-color)', cursor: 'pointer', transition: 'all 0.3s ease' }} onClick={() => navigate(`/project/${project.id}`)}>
+              {/* Cover Image */}
+              <div className="card-cover" style={{ height: '180px', position: 'relative', backgroundImage: `url(${project.coverImage})`, backgroundSize: 'cover', backgroundPosition: 'center' }}>
+                <div style={{ position: 'absolute', top: 12, left: 12, padding: '4px 10px', background: 'var(--primary-color)', color: '#fff', fontSize: '10px', fontWeight: 800, borderRadius: '4px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  {project.status === 'in-progress' ? 'IN PROGRESS' : project.status === 'planning' ? 'PLANNING' : 'COMPLETED'}
+                </div>
+                {project.openPins > 50 && (
+                  <div style={{ position: 'absolute', top: 12, right: 12, padding: '4px 10px', background: '#ef4444', color: '#fff', fontSize: '10px', fontWeight: 800, borderRadius: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <AlertTriangle size={12} /> {project.openPins > 100 ? 'PRIORITY ALERT' : 'ALERTS'}
+                  </div>
+                )}
+              </div>
+              
+              {/* Content */}
+              <div className="card-body" style={{ padding: '20px' }}>
+                <h3 style={{ margin: '0 0 4px 0', fontSize: '1.25rem', fontWeight: 700 }}>{project.name}</h3>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: 'var(--text-muted)', fontSize: '12px', marginBottom: '20px' }}>
+                  <MapPin size={12} /> {project.address || 'Location not specified'}
+                </div>
+
+                {/* Progress */}
+                <div className="progress-section" style={{ marginBottom: '20px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', fontWeight: 600, marginBottom: '6px' }}>
+                    <span style={{ color: 'var(--text-main)' }}>Overall Progress</span>
+                    <span style={{ color: 'var(--primary-color)' }}>{project.progress}%</span>
+                  </div>
+                  <div style={{ height: '4px', background: 'var(--bg-main)', borderRadius: '2px', overflow: 'hidden' }}>
+                    <div style={{ height: '100%', width: `${project.progress}%`, background: 'var(--primary-color)', borderRadius: '2px' }}></div>
+                  </div>
+                </div>
+
+                {/* Stats */}
+                <div style={{ display: 'flex', gap: '12px', marginBottom: '20px' }}>
+                  <div style={{ flex: 1, background: 'var(--bg-main)', padding: '12px', borderRadius: '12px' }}>
+                    <div style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: 600, marginBottom: '4px' }}>Open Pins</div>
+                    <div style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--text-main)' }}>{project.openPins}</div>
+                  </div>
+                  <div style={{ flex: 1, background: 'var(--bg-main)', padding: '12px', borderRadius: '12px' }}>
+                    <div style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: 600, marginBottom: '4px' }}>Crew Count</div>
+                    <div style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--text-main)' }}>{project.crewCount}</div>
+                  </div>
+                </div>
+
+                <div style={{ textAlign: 'center', padding: '10px', background: 'var(--bg-main)', borderRadius: '8px', fontSize: '13px', fontWeight: 600, color: 'var(--text-main)' }}>
+                  View Site Details →
+                </div>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+
+      {/* New Project Modal */}
+      {showNewProject && (
+        <div className="modal-overlay">
+          <div className="modal">
+            <h2>Yeni Proje Oluştur</h2>
+            <input placeholder="Proje Adı *" value={newProject.name}
+              onChange={e => setNewProject({...newProject, name: e.target.value})} />
+            <input placeholder="Kısa Açıklama" value={newProject.description}
+              onChange={e => setNewProject({...newProject, description: e.target.value})} />
+            <input placeholder="Adres" value={newProject.address}
+              onChange={e => setNewProject({...newProject, address: e.target.value})} />
+            <div className="modal-actions">
+              <button className="btn-primary" onClick={createProject}>Oluştur</button>
+              <button className="btn-secondary" onClick={() => setShowNewProject(false)}>İptal</button>
+            </div>
+          </div>
+        </div>
       )}
-
-      {activeSection === 'market' && <MarketPrices />}
-      
-      {activeSection === 'budget' && <BudgetCalculator />}
-
-      {activeSection === 'calendar' && <GlobalCalendar />}
     </div>
   );
 }
