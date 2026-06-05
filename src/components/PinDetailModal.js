@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { db, auth } from '../firebase';
-import { collection, query, where, orderBy, onSnapshot, addDoc, serverTimestamp, deleteDoc, doc, updateDoc, getDocs, writeBatch } from 'firebase/firestore';
-import { X, Edit2, Trash2, Send, Paperclip, FileText, Image as ImageIcon, CornerUpLeft, Search, Pin, PinOff, Info, Images, MapPin, UserCheck, Plus } from 'lucide-react';
+import { db } from '../firebase';
+import { collection, query, where, orderBy, onSnapshot, addDoc, serverTimestamp, doc, updateDoc } from 'firebase/firestore';
+import { X, Send, Paperclip, FileText, CornerUpLeft, Search, Pin, PinOff, Info, Images, MapPin, UserCheck } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import ImageMarkupModal from './ImageMarkupModal';
 import './PinDetailModal.css';
@@ -18,7 +18,6 @@ const CATEGORY_COLORS = {
   'mekanik': '#f97316', 
   'diğer': '#64748b'
 };
-const CATEGORIES = Object.keys(CATEGORY_COLORS);
 
 export default function PinDetailModal({ pin, pins, setSelectedPin, projectId, isManager, onClose }) {
   const { currentUser, userData } = useAuth();
@@ -31,7 +30,6 @@ export default function PinDetailModal({ pin, pins, setSelectedPin, projectId, i
   const [status, setStatus] = useState(pin.status);
   const [priority, setPriority] = useState(pin.priority || 'Normal');
   const [pinCategory, setPinCategory] = useState(pin.category || 'genel');
-  const [pinColor, setPinColor] = useState(pin.color || '#3b82f6');
   const [pinTitle, setPinTitle] = useState(pin.title || `Pin ${pin.category}`);
   const [pinInfo, setPinInfo] = useState(pin.info || '');
   
@@ -44,6 +42,8 @@ export default function PinDetailModal({ pin, pins, setSelectedPin, projectId, i
   const [showMention, setShowMention] = useState(false);
   const [chatSearch, setChatSearch] = useState('');
   const [showSearch, setShowSearch] = useState(false);
+  
+  const [activeAccordion, setActiveAccordion] = useState(null);
   
   const [searchPins, setSearchPins] = useState('');
 
@@ -61,7 +61,6 @@ export default function PinDetailModal({ pin, pins, setSelectedPin, projectId, i
     setStatus(pin.status);
     setPriority(pin.priority || 'Normal');
     setPinCategory(pin.category || 'genel');
-    setPinColor(pin.color || '#3b82f6');
     setPinTitle(pin.title || `Pin ${pin.category}`);
     setPinInfo(pin.info || '');
   }, [pin]);
@@ -83,12 +82,13 @@ export default function PinDetailModal({ pin, pins, setSelectedPin, projectId, i
   }, [pin.id]);
 
   async function sendMessage(fileUrl = null, fileType = null, fileDescription = '') {
-    if (!text.trim() && !fileUrl) return;
+    const messageText = text.trim();
+    if (!messageText && !fileUrl) return;
     try {
       await addDoc(collection(db, 'messages'), {
         pinId: pin.id,
         projectId,
-        text: text.trim(),
+        text: messageText,
         userId: currentUser.uid,
         userName: userData?.name,
         userRole: userData?.role,
@@ -99,6 +99,30 @@ export default function PinDetailModal({ pin, pins, setSelectedPin, projectId, i
         isPinned: false,
         createdAt: serverTimestamp()
       });
+
+      // Handle Mentions
+      const mentionedNames = messageText.match(/@([\wçğıöşüÇĞİÖŞÜ]+(?:\s[\wçğıöşüÇĞİÖŞÜ]+)?)/g);
+      if (mentionedNames) {
+        for (const mention of mentionedNames) {
+          const name = mention.substring(1).toLowerCase();
+          // Find matching user
+          const mentionedUser = users.find(u => 
+            u.name && u.name.toLowerCase().startsWith(name) && u.id !== currentUser.uid
+          );
+          if (mentionedUser) {
+            await addDoc(collection(db, 'notifications'), {
+              userId: mentionedUser.id,
+              projectId,
+              pinId: pin.id,
+              message: `${userData?.name || 'Biri'} seni "${pin.title || 'bir pin'}" içinde etiketledi.`,
+              type: 'mention',
+              read: false,
+              createdAt: serverTimestamp()
+            });
+          }
+        }
+      }
+
       setText('');
       setReplyTo(null);
       setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
@@ -157,11 +181,24 @@ export default function PinDetailModal({ pin, pins, setSelectedPin, projectId, i
     if (markupTarget === 'files') {
       description = window.prompt("Fotoğraf için bir açıklama (isteğe bağlı):") || '';
     }
-    const markupFile = new File([blob], 'photo_markup.jpg', { type: 'image/jpeg' });
+    uploadToCloudinary(blob, markupTarget, description);
     setMarkupImageUrl(null);
-    await uploadToCloudinary(markupFile, markupTarget, description);
-    setMarkupTarget(null);
+    if (objectUrlRef.current) {
+      URL.revokeObjectURL(objectUrlRef.current);
+      objectUrlRef.current = null;
+    }
   }
+
+  async function handleUpdateInfo() {
+    if (!pin) return;
+    try {
+      await updateDoc(doc(db, 'pins', pin.id), { info: pinInfo });
+      // alert('Bilgi güncellendi!');
+    } catch (e) {
+      console.error("Error updating info:", e);
+    }
+  }
+
 
   async function togglePinMessage(msgId, currentIsPinned) {
     await updateDoc(doc(db, 'messages', msgId), { isPinned: !currentIsPinned });
@@ -220,7 +257,6 @@ export default function PinDetailModal({ pin, pins, setSelectedPin, projectId, i
           <div className="pins-scroll-list">
             {filteredPins.length > 0 ? filteredPins.map(p => {
               const isActive = pin.id === p.id;
-              const isResolved = p.status === 'Çözüldü';
               return (
                 <div key={p.id} onClick={() => setSelectedPin(p)} className={`sidebar-pin-item ${isActive ? 'active' : ''}`}>
                   <div className="pin-item-header">
@@ -231,8 +267,9 @@ export default function PinDetailModal({ pin, pins, setSelectedPin, projectId, i
                   </div>
                   <h4>{p.title || `Pin ${p.category}`}</h4>
                   <div className="pin-item-footer">
-                    <span className={`status-badge ${isResolved ? 'resolved' : 'open'}`}>
-                      {isResolved ? 'RESOLVED' : 'OPEN'}
+                    <span className="category-badge" style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                      <span style={{ display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', backgroundColor: CATEGORY_COLORS[(p.category || 'genel').toLowerCase()] || 'var(--primary-color)' }}></span>
+                      {(p.category || 'Genel').toUpperCase()}
                     </span>
                     {p.info && <span className="pin-desc">{p.info}</span>}
                   </div>
@@ -268,33 +305,100 @@ export default function PinDetailModal({ pin, pins, setSelectedPin, projectId, i
           {/* Scrollable Content */}
           <div className="main-content-scroll">
             
-            {/* Info Cards */}
-            <div className="info-cards-grid">
-              <div className="info-card details-card">
-                <h4><Info size={16} /> Details</h4>
-                <div className="detail-row">
-                  <span className="label">Created</span>
-                  <span className="value">{pin.createdAt?.toDate ? pin.createdAt.toDate().toLocaleDateString() : 'Unknown'}</span>
+            {/* Big Action Buttons */}
+            <div className="big-action-buttons-container">
+              <button 
+                className={`big-action-btn ${activeAccordion === 'details' ? 'active' : ''}`}
+                onClick={() => setActiveAccordion(activeAccordion === 'details' ? null : 'details')}
+              >
+                <Info size={28} />
+                <span>Bilgi</span>
+              </button>
+              <button 
+                className={`big-action-btn ${activeAccordion === 'media' ? 'active' : ''}`}
+                onClick={() => setActiveAccordion(activeAccordion === 'media' ? null : 'media')}
+              >
+                <Images size={28} />
+                <span>Medya</span>
+              </button>
+            </div>
+
+            {activeAccordion === 'details' && (
+              <div className="accordion-content">
+                <div style={{ marginBottom: '16px' }}>
+                  <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '8px', textTransform: 'uppercase' }}>
+                    Pin Bilgisi
+                  </label>
+                  <textarea 
+                    value={pinInfo}
+                    onChange={(e) => setPinInfo(e.target.value)}
+                    placeholder="Bu pin hakkında notlar ekleyin..."
+                    style={{ 
+                      width: '100%', 
+                      minHeight: '80px', 
+                      padding: '12px', 
+                      borderRadius: '8px', 
+                      border: '1px solid var(--border-color)', 
+                      background: 'var(--bg-main)', 
+                      resize: 'vertical',
+                      fontSize: '14px',
+                      color: 'var(--text-main)',
+                      outline: 'none',
+                      fontFamily: 'inherit'
+                    }}
+                  />
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '12px' }}>
+                    <div className="media-add">
+                      <label className="media-add-btn" style={{ padding: '6px 12px', borderRadius: '6px', fontSize: '13px' }}>
+                        <Paperclip size={14} /> Dosya Ekle
+                        <input type="file" onChange={(e) => handleFileSelect(e, 'files')} style={{ display: 'none' }} />
+                      </label>
+                    </div>
+                    <button 
+                      onClick={handleUpdateInfo}
+                      style={{ 
+                        background: 'var(--primary-color)', 
+                        color: 'white', 
+                        border: 'none', 
+                        padding: '6px 16px', 
+                        borderRadius: '6px', 
+                        fontSize: '13px', 
+                        fontWeight: 600,
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Kaydet
+                    </button>
+                  </div>
                 </div>
-                <div className="detail-row">
-                  <span className="label">Priority</span>
-                  <span className={`value priority-${priority === 'Acil' ? 'high' : priority === 'Yüksek' ? 'medium' : 'normal'}`}>
-                    {priority === 'Acil' ? 'High' : priority === 'Yüksek' ? 'Medium' : 'Normal'}
-                  </span>
-                </div>
-                <div className="detail-row">
-                  <span className="label">Trade</span>
-                  <span className="value capitalize">{pinCategory}</span>
+
+                <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '16px' }}>
+                  <div className="detail-row">
+                    <span className="label">Oluşturuldu</span>
+                    <span className="value">{pin.createdAt?.toDate ? pin.createdAt.toDate().toLocaleDateString() : 'Unknown'}</span>
+                  </div>
+                  <div className="detail-row">
+                    <span className="label">Öncelik</span>
+                    <span className={`value priority-${priority === 'Acil' ? 'high' : priority === 'Yüksek' ? 'medium' : 'normal'}`}>
+                      {priority}
+                    </span>
+                  </div>
+                  <div className="detail-row">
+                    <span className="label">Kategori</span>
+                    <span className="value capitalize">{pinCategory}</span>
+                  </div>
                 </div>
               </div>
+            )}
 
-              <div className="info-card media-card">
+            {activeAccordion === 'media' && (
+              <div className="accordion-content">
                 <div className="media-header">
-                  <h4><Images size={16} /> Media</h4>
-                  <span className="file-count">{files.length} Files</span>
+                  <h4><Images size={16} /> Dosyalar</h4>
+                  <span className="file-count">{files.length} Dosya</span>
                 </div>
                 <div className="media-list">
-                  {files.slice(0, 3).map(f => (
+                  {files.map(f => (
                     f.type?.startsWith('image/') ? (
                       <img key={f.id} src={f.url} alt="" className="media-thumb" onClick={() => window.open(f.url, '_blank')} />
                     ) : (
@@ -303,9 +407,6 @@ export default function PinDetailModal({ pin, pins, setSelectedPin, projectId, i
                       </div>
                     )
                   ))}
-                  {files.length > 3 && (
-                    <div className="media-more">+{files.length - 3}</div>
-                  )}
                   {(isManager || pin.createdBy === currentUser.uid) && (
                     <label className="media-add">
                       {uploading ? '...' : '+'}
@@ -314,7 +415,7 @@ export default function PinDetailModal({ pin, pins, setSelectedPin, projectId, i
                   )}
                 </div>
               </div>
-            </div>
+            )}
 
             {/* Pinned Message */}
             {displayedMessages.find(m => m.isPinned) && (

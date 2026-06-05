@@ -6,7 +6,6 @@ import Projects from './pages/Projects';
 import ProjectDetail from './pages/ProjectDetail';
 import Profile from './pages/Profile';
 import NotificationsPage from './pages/NotificationsPage';
-import BottomNav from './components/BottomNav';
 import Layout from './components/Layout';
 import GlobalCalendar from './pages/GlobalCalendar';
 import MarketPrices from './pages/MarketPrices';
@@ -109,7 +108,7 @@ function AppRoutes() {
         <Route path="/calendar" element={<PrivateRoute><Layout><GlobalCalendar /></Layout></PrivateRoute>} />
         <Route path="/materials" element={<PrivateRoute><Layout><MarketPrices /></Layout></PrivateRoute>} />
         <Route path="/profile" element={<PrivateRoute><Layout><Profile /></Layout></PrivateRoute>} />
-        <Route path="/project/:projectId" element={<PrivateRoute><Layout><ProjectDetail /></Layout></PrivateRoute>} />
+        <Route path="/project/:projectId" element={<PrivateRoute><ProjectDetail /></PrivateRoute>} />
         <Route path="/notifications" element={<PrivateRoute><Layout><NotificationsPage /></Layout></PrivateRoute>} />
       </Routes>
       <ThemeToggle />

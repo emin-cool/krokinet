@@ -1,7 +1,7 @@
 /* eslint-disable no-unused-vars, react-hooks/exhaustive-deps */
 import React, { useState, useEffect } from 'react';
 import { db } from '../firebase';
-import { collection, getDocs, addDoc, doc, setDoc, serverTimestamp, updateDoc, arrayUnion, arrayRemove, getDoc, onSnapshot, query, limit, deleteField } from 'firebase/firestore';
+import { collection, getDocs, addDoc, doc, setDoc, serverTimestamp, updateDoc, arrayUnion, arrayRemove, getDoc, onSnapshot, query, limit, deleteField, deleteDoc } from 'firebase/firestore';
 import { generateStrongPassword } from '../utils/constants';
 import { initializeApp, getApps } from 'firebase/app';
 import { getAuth, createUserWithEmailAndPassword } from 'firebase/auth';
@@ -111,12 +111,17 @@ export default function ProjectTeam({ projectId, isManager }) {
   }
 
   async function removeUser(userId) {
-    if (!window.confirm('Bu kullanıcıyı projeden çıkarmak istiyor musunuz?')) return;
+    if (!window.confirm('Bu kullanıcıyı projeden çıkarmak ve sistemden tamamen silmek istiyor musunuz?')) return;
     const projectRef = doc(db, 'projects', projectId);
     await updateDoc(projectRef, { 
       memberIds: arrayRemove(userId),
       [`memberRoles.${userId}`]: deleteField()
     });
+    try {
+      await deleteDoc(doc(db, 'users', userId));
+    } catch (e) {
+      console.error('Kullanıcı dökümanı silinemedi:', e);
+    }
   }
 
   const nonMembers = allUsers.filter(u => !u.isSuperAdmin && !(project?.memberIds || []).includes(u.id));

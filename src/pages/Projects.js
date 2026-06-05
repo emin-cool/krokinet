@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { db, auth } from '../firebase';
-import { collection, query, where, getDocs, addDoc, serverTimestamp, updateDoc, doc, deleteDoc, writeBatch } from 'firebase/firestore';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { db } from '../firebase';
+import { collection, query, where, getDocs, addDoc, serverTimestamp } from 'firebase/firestore';
 import { useAuth } from '../contexts/AuthContext';
-import { MapPin, Search, Bell, Settings, Plus, AlertTriangle } from 'lucide-react';
+import { MapPin, Search, Settings, Plus, AlertTriangle } from 'lucide-react';
 import NotificationsDropdown from '../components/NotificationsDropdown';
 
 // Random placeholders for UI
@@ -20,14 +20,12 @@ export default function Projects() {
   const [showNewProject, setShowNewProject] = useState(false);
   const [newProject, setNewProject] = useState({ name: '', description: '', address: '' });
   const [filter, setFilter] = useState('all'); // all, in-progress, planning, completed
+  const [searchQuery, setSearchQuery] = useState('');
   const { currentUser, userData } = useAuth();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
 
-  useEffect(() => {
-    fetchProjects();
-  }, [currentUser, userData]);
-
-  async function fetchProjects() {
+  const fetchProjects = useCallback(async () => {
     if (!currentUser) return;
     try {
       let snapshot;
@@ -37,20 +35,36 @@ export default function Projects() {
         const q = query(collection(db, 'projects'), where('memberIds', 'array-contains', currentUser.uid));
         snapshot = await getDocs(q);
       }
-      // Add random stats and cover images to project objects for demo purposes
-      const fetched = snapshot.docs.map((doc, i) => ({ 
-        id: doc.id, 
-        ...doc.data(),
-        coverImage: doc.data().coverImage || COVER_IMAGES[i % COVER_IMAGES.length],
-        progress: Math.floor(Math.random() * 100),
-        openPins: Math.floor(Math.random() * 120),
-        crewCount: Math.floor(Math.random() * 50) + 5,
-        status: ['in-progress', 'planning', 'completed'][i % 3] // mock status
-      }));
+      
+      const fetched = snapshot.docs.map((doc, i) => {
+        const data = doc.data();
+        let status = 'in-progress';
+        if (data.status === 'planlama') status = 'planning';
+        else if (data.status === 'tamamlandı') status = 'completed';
+
+        return { 
+          id: doc.id, 
+          ...data,
+          coverImage: data.coverImage || COVER_IMAGES[i % COVER_IMAGES.length],
+          progress: data.progress || 0,
+          openPins: data.openPins || 0, // In a real app, this would be queried from pins collection
+          crewCount: data.memberIds ? data.memberIds.length : 1,
+          status: status
+        };
+      });
       setProjects(fetched);
     } catch (err) { console.error(err); }
     setLoading(false);
-  }
+  }, [currentUser, userData]);
+
+  useEffect(() => {
+    fetchProjects();
+    if (searchParams.get('new') === 'true') {
+      setShowNewProject(true);
+      // Clean up URL parameter so it doesn't reopen on refresh
+      setSearchParams({});
+    }
+  }, [fetchProjects, searchParams, setSearchParams]);
 
   async function createProject() {
     if (!newProject.name) return;
@@ -72,8 +86,9 @@ export default function Projects() {
   const currentDate = new Date().toLocaleDateString('tr-TR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 
   const filteredProjects = projects.filter(p => {
-    if (filter === 'all') return true;
-    return p.status === filter;
+    const matchesFilter = filter === 'all' || p.status === filter;
+    const matchesSearch = (p.name || '').toLowerCase().includes(searchQuery.toLowerCase());
+    return matchesFilter && matchesSearch;
   });
 
   if (loading) return <div className="loading">Yükleniyor...</div>;
@@ -86,7 +101,9 @@ export default function Projects() {
           <Search size={18} style={{ position: 'absolute', left: 12, top: 10, color: 'var(--text-muted)' }} />
           <input 
             type="text" 
-            placeholder="Search blueprints, sites, or teams..." 
+            placeholder="Search projects..." 
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
             style={{ width: '100%', padding: '10px 10px 10px 36px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-surface)' }}
           />
         </div>
@@ -114,9 +131,6 @@ export default function Projects() {
             <p style={{ margin: '4px 0 0 0', color: 'var(--text-muted)', fontSize: '14px' }}>{currentDate}</p>
           </div>
           <div style={{ display: 'flex', gap: '12px' }}>
-            <button className="btn-secondary" style={{ borderRadius: '20px' }}>
-               Filter
-            </button>
             {(userData?.isSuperAdmin || true) && ( // Allowing all users to see the button for demo
               <button className="btn-primary" style={{ borderRadius: '20px', padding: '10px 20px' }} onClick={() => setShowNewProject(true)}>
                 <Plus size={16} /> New Project

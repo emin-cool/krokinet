@@ -1,7 +1,7 @@
 /* eslint-disable no-unused-vars, react-hooks/exhaustive-deps */
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import { db } from '../firebase';
+import { db, auth } from '../firebase';
 import { doc, getDoc, collection, query, where, addDoc, serverTimestamp, onSnapshot, updateDoc, getDocs, writeBatch, deleteDoc } from 'firebase/firestore';
 import { useAuth } from '../contexts/AuthContext';
 import PinDetailModal from '../components/PinDetailModal';
@@ -12,7 +12,7 @@ import ProjectTeam from '../components/ProjectTeam';
 import ProjectSchedule from '../components/ProjectSchedule';
 import NotificationsDropdown from '../components/NotificationsDropdown';
 import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
-import { Building, Ruler, MessageSquare, Info, Users, MapPin, Archive, ArrowLeft, CalendarDays, Trash2 } from 'lucide-react';
+import { Building, Ruler, MessageSquare, Info, Users, MapPin, Archive, ArrowLeft, CalendarDays, Trash2, Plus, Search, Image as ImageIcon, Share2, Edit2, Calendar, AlignLeft, FileText, Download, MoreVertical, FolderPlus, Upload } from 'lucide-react';
 
 const CATEGORIES = Object.keys(CATEGORY_COLORS);
 
@@ -41,6 +41,8 @@ export default function ProjectDetail() {
 
   const [selectedPin, setSelectedPin] = useState(null);
   const [addingPin, setAddingPin] = useState(false);
+  const [viewMode, setViewMode] = useState('view'); // 'view' or 'edit'
+  const [selectedCategory, setSelectedCategory] = useState('All');
   const [newPinData, setNewPinData] = useState({ title: '', category: 'genel', color: '#3b82f6' });
   const [newPinCoords, setNewPinCoords] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -51,7 +53,7 @@ export default function ProjectDetail() {
   const [editingFloorIndex, setEditingFloorIndex] = useState(null);
   const [editingFloorName, setEditingFloorName] = useState('');
   const [mapRotation, setMapRotation] = useState(0);
-  const [activeFolder, setActiveFolder] = useState(null);
+  const [activeFolder, setActiveFolder] = useState('Genel Dosyalar');
 
   useEffect(() => {
     fetchProject();
@@ -231,6 +233,7 @@ export default function ProjectDetail() {
     try {
       const updatedFolders = [...(project.projectFolders || []), folderName.trim()];
       await updateDoc(doc(db, 'projects', projectId), { projectFolders: updatedFolders });
+      setActiveFolder(folderName.trim());
       fetchProject();
     } catch (err) { alert('Klasör oluşturulamadı.'); }
   }
@@ -369,7 +372,9 @@ export default function ProjectDetail() {
   const canAddPin = isManager;
   const canManageTeam = isManager;
   const currentFloorPins = pins.filter(p => {
+    if (p.isArchived) return false;
     if (p.floorPlanIndex !== activeFloor) return false;
+    if (selectedCategory !== 'All' && p.category !== selectedCategory) return false;
     
     // Filtreleme
     if (pinFilter === 'open' && p.status !== 'açık') return false;
@@ -396,110 +401,70 @@ export default function ProjectDetail() {
   const floorPlans = project.floorPlans || [];
 
   return (
-    <div className="project-detail">
-      <div className="detail-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 24px', background: 'var(--bg-surface)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', borderBottom: '1px solid var(--border-color)', position: 'sticky', top: 0, zIndex: 100 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-          <button 
-            onClick={() => navigate('/')}
-            style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 40, height: 40, borderRadius: '50%', background: 'var(--bg-card-hover)', border: 'none', cursor: 'pointer', transition: 'all 0.2s', color: 'var(--text-main)' }}
-            className="back-btn-hover"
-            title="Geri Dön"
-          >
-            <ArrowLeft size={20} />
-          </button>
-          <div className="projects-top-left" style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-            <div className="app-logo-container" style={{ width: '56px', height: '56px' }}>
-              <img src="/logo.png" alt="Yapı Chat Logo" />
-            </div>
-            <div>
-              <h1 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 800, color: 'var(--text-main)', letterSpacing: '-0.02em' }}>{project.name}</h1>
-              <p style={{ margin: 0, fontSize: '0.875rem', color: 'var(--text-muted)' }}>{userData?.name} ({userData?.role})</p>
-            </div>
-          </div>
-        </div>
-        <div className="header-actions" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <NotificationsDropdown />
-          <button className="btn-secondary" onClick={() => navigate('/profile')} style={{ borderRadius: '20px', padding: '8px 16px', fontWeight: 600 }}>Profilim</button>
-        </div>
-      </div>
+    <div style={{ width: '100%', height: '100vh', display: 'flex', flexDirection: 'column', margin: 0, padding: 0, overflow: 'hidden' }}>
+      {/* Top Header Removed per user request */}
 
       <div className="project-content-layout" style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
         <div className="detail-tabs vertical-tabs" style={{ width: '220px', borderRight: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', padding: '24px 16px', gap: '12px', background: 'var(--bg-surface)' }}>
-          <button className={activeTab === 'plan' ? 'tab active' : 'tab'} onClick={() => setActiveTab('plan')} style={{ justifyContent: 'flex-start', padding: '12px 16px', borderRadius: '12px', border: 'none', background: activeTab === 'plan' ? 'var(--primary-color)' : 'transparent', color: activeTab === 'plan' ? '#fff' : 'var(--text-secondary)', fontWeight: 600 }}>
-            <Ruler size={18} style={{ marginRight: '12px' }} /> Kat Planı
-          </button>
-          <button className={activeTab === 'info' ? 'tab active' : 'tab'} onClick={() => setActiveTab('info')} style={{ justifyContent: 'flex-start', padding: '12px 16px', borderRadius: '12px', border: 'none', background: activeTab === 'info' ? 'var(--primary-color)' : 'transparent', color: activeTab === 'info' ? '#fff' : 'var(--text-secondary)', fontWeight: 600 }}>
-            <Info size={18} style={{ marginRight: '12px' }} /> Proje Bilgileri
-          </button>
-          <button className={activeTab === 'schedule' ? 'tab active' : 'tab'} onClick={() => setActiveTab('schedule')} style={{ justifyContent: 'flex-start', padding: '12px 16px', borderRadius: '12px', border: 'none', background: activeTab === 'schedule' ? 'var(--primary-color)' : 'transparent', color: activeTab === 'schedule' ? '#fff' : 'var(--text-secondary)', fontWeight: 600 }}>
-            <CalendarDays size={18} style={{ marginRight: '12px' }} /> İş Programı
-          </button>
-          <button className={activeTab === 'team' ? 'tab active' : 'tab'} onClick={() => setActiveTab('team')} style={{ justifyContent: 'flex-start', padding: '12px 16px', borderRadius: '12px', border: 'none', background: activeTab === 'team' ? 'var(--primary-color)' : 'transparent', color: activeTab === 'team' ? '#fff' : 'var(--text-secondary)', fontWeight: 600 }}>
-            <Users size={18} style={{ marginRight: '12px' }} /> Ekip
-          </button>
-          {isManager && (
-            <button className={activeTab === 'archive' ? 'tab active' : 'tab'} onClick={() => setActiveTab('archive')} style={{ justifyContent: 'flex-start', padding: '12px 16px', borderRadius: '12px', border: 'none', background: activeTab === 'archive' ? 'var(--primary-color)' : 'transparent', color: activeTab === 'archive' ? '#fff' : 'var(--text-secondary)', fontWeight: 600 }}>
-              <Archive size={18} style={{ marginRight: '12px' }} /> Arşiv
+          
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', paddingBottom: '24px', borderBottom: '1px solid var(--border-color)', marginBottom: '8px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', justifyContent: 'flex-start' }}>
+              <button 
+                onClick={() => navigate('/')}
+                style={{ background: '#1e1b4b', border: 'none', cursor: 'pointer', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '8px', borderRadius: '8px', minWidth: '32px' }}
+                title="Geri Dön"
+              >
+                <ArrowLeft size={16} />
+              </button>
+              <div>
+                <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 800, color: '#1e1b4b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {project.name}
+                </h2>
+              </div>
+            </div>
+          </div>
+          <div className="sidebar-menus">
+            <button className={`tab ${activeTab === 'plan' ? 'active' : ''}`} onClick={() => setActiveTab('plan')} style={{ justifyContent: 'flex-start', padding: '10px 16px' }} title="Kat Planı">
+              <span style={{ marginRight: '12px', fontSize: '18px' }}>🗺️</span> Kat Planı
             </button>
-          )}
+            <button className={`tab ${activeTab === 'info' ? 'active' : ''}`} onClick={() => setActiveTab('info')} style={{ justifyContent: 'flex-start', padding: '10px 16px' }} title="Proje Bilgileri">
+              <span style={{ marginRight: '12px', fontSize: '18px' }}>ℹ️</span> Proje Bilgileri
+            </button>
+            <button className={`tab ${activeTab === 'team' ? 'active' : ''}`} onClick={() => setActiveTab('team')} style={{ justifyContent: 'flex-start', padding: '10px 16px' }} title="Ekip Üyeleri">
+              <span style={{ marginRight: '12px', fontSize: '18px' }}>👥</span> Ekip Üyeleri
+            </button>
+            {isManager && (
+              <button className={`tab ${activeTab === 'archive' ? 'active' : ''}`} onClick={() => setActiveTab('archive')} style={{ justifyContent: 'flex-start', padding: '10px 16px' }} title="Arşiv">
+                <span style={{ marginRight: '12px', fontSize: '18px' }}>📦</span> Arşiv
+              </button>
+            )}
+            
+            <div style={{ marginTop: '32px', marginBottom: '16px', display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '8px' }}>
+              <div style={{ fontSize: '11px', fontWeight: 700, color: '#9ca3af', marginBottom: '4px', letterSpacing: '0.05em' }}>HIZLI İŞLEM</div>
+              <button className="btn-primary" onClick={() => { 
+                setActiveTab('plan'); 
+                if (viewMode !== 'edit') {
+                  setViewMode('edit');
+                }
+                setAddingPin(!addingPin); 
+              }} style={{ width: '100%', padding: '12px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', fontWeight: 600, background: '#4f46e5', color: '#fff', border: 'none', cursor: 'pointer', boxShadow: '0 4px 6px -1px rgba(79, 70, 229, 0.2)' }} title="Yeni Pin">
+                <Plus size={18} />
+                Yeni Pin
+              </button>
+
+              <label style={{ width: '100%', padding: '12px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', fontWeight: 600, background: '#fff', color: '#4f46e5', border: '1px solid #4f46e5', cursor: 'pointer', boxShadow: '0 4px 6px -1px rgba(79, 70, 229, 0.1)' }} title="Kat Planı Yükle">
+                <ImageIcon size={18} />
+                Kat Planı Yükle
+                <input type="file" hidden onChange={uploadFloorPlan} accept="image/*,.pdf" />
+              </label>
+            </div>
+          </div>
         </div>
         
         <div className="tab-content-area" style={{ flex: 1, overflowY: 'auto', position: 'relative' }}>
 
       {activeTab === 'plan' && (
         <div className="plan-view">
-          {/* Stitch-style floor tabs - pill menu */}
-          <div className="floor-tabs">
-            {floorPlans.map((fp, i) => {
-              if (fp.isArchived) return null;
-              return (
-              <div key={i} className="floor-tab-wrapper">
-                <button className={activeFloor === i ? 'floor-tab active' : 'floor-tab'} onClick={() => setActiveFloor(i)}>
-                  {editingFloorIndex === i ? (
-                    <input
-                      className="floor-tab-input"
-                      value={editingFloorName}
-                      onChange={e => setEditingFloorName(e.target.value)}
-                      onBlur={() => renameFloorPlan(i, editingFloorName)}
-                      onKeyDown={e => {
-                        if (e.key === 'Enter') renameFloorPlan(i, editingFloorName);
-                        if (e.key === 'Escape') setEditingFloorIndex(null);
-                      }}
-                      autoFocus
-                      style={{ background: 'transparent', border: 'none', outline: 'none', color: 'inherit', fontSize: 'inherit', fontWeight: 'inherit', width: 80, textAlign: 'center' }}
-                    />
-                  ) : (
-                    <span onDoubleClick={() => isManager && setEditingFloorIndex(i)}>
-                      {fp.name}
-                    </span>
-                  )}
-                </button>
-                {isManager && (
-                  <div style={{ display: 'flex', gap: 2 }}>
-                    <button className="floor-tab-delete" onClick={() => toggleArchiveFloorPlan(i, fp.isArchived)} style={{ color: '#4b5563', padding: '0 4px', fontSize: 10 }} title={fp.isArchived ? 'Arşivden Çıkar' : 'Arşivle'}>
-                      📦
-                    </button>
-                    <button className="floor-tab-delete" onClick={() => deleteFloorPlan(i, fp.name)} style={{ fontSize: 10 }}>✕</button>
-                  </div>
-                )}
-              </div>
-            )})}
-            {isManager && (
-              <>
-                <button className="btn-primary desktop-new-pin-btn" onClick={() => setAddingPin(!addingPin)} style={{ padding: '6px 14px', fontSize: 12, borderRadius: 9999 }}>
-                  {addingPin ? '✕' : '📍 Pin'}
-                </button>
-                <button className="fab-button" onClick={() => setAddingPin(!addingPin)}>
-                  {addingPin ? '✕' : '+'}
-                </button>
-                <label style={{ padding: '6px 14px', fontSize: 12, borderRadius: 9999, cursor: 'pointer', background: 'var(--bg-card)', border: '1px solid var(--border-color)', color: 'var(--text-main)', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' }} className="hide-on-mobile">
-                  {uploadingPlan ? '...' : '🗺️ Plan'}
-                  <input type="file" hidden accept="image/*,.pdf" onChange={uploadFloorPlan} />
-                </label>
-              </>
-            )}
-          </div>
-
           {addingPin && (
             <div className="pin-form" style={{ margin: '0 0 12px 0' }}>
               {!newPinCoords ? (
@@ -526,67 +491,72 @@ export default function ProjectDetail() {
           {floorPlans.length === 0 ? (
             <div className="empty-state" style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>Henüz kat planı yüklenmemiş.</div>
           ) : (
-            <div style={{ flex: 1, overflow: 'hidden', position: 'relative' }}>
-              {/* Stitch-style glassmorphism category overlay */}
-              <div className="plan-header-overlay">
-                <div className="plan-category-pills">
+            <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column', position: 'relative' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 24px', borderBottom: '1px solid var(--border-color)', background: '#fff', flexWrap: 'wrap', gap: '16px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                  <select 
+                    value={activeFloor} 
+                    onChange={e => setActiveFloor(Number(e.target.value))}
+                    style={{ margin: 0, fontSize: '18px', fontWeight: 700, color: '#1e1b4b', border: 'none', background: 'transparent', outline: 'none', cursor: 'pointer', appearance: 'auto' }}
+                  >
+                    {floorPlans.map((fp, i) => {
+                      if (fp.isArchived) return null;
+                      return <option key={i} value={i}>{fp.name}</option>;
+                    })}
+                  </select>
+                  <div style={{ width: '1px', height: '20px', background: 'var(--border-color)' }}></div>
+                  <div style={{ display: 'flex', gap: '8px', background: '#f1f5f9', padding: '4px', borderRadius: '24px' }}>
+                    <button onClick={() => { setViewMode('view'); setAddingPin(false); }} style={{ background: viewMode === 'view' ? '#4f46e5' : 'transparent', color: viewMode === 'view' ? '#fff' : '#64748b', border: 'none', borderRadius: '20px', padding: '4px 16px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', transition: 'all 0.2s' }}>View</button>
+                    <button onClick={() => setViewMode('edit')} style={{ background: viewMode === 'edit' ? '#4f46e5' : 'transparent', color: viewMode === 'edit' ? '#fff' : '#64748b', border: 'none', borderRadius: '20px', padding: '4px 16px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', transition: 'all 0.2s' }}>Edit</button>
+                  </div>
+                </div>
+
+                {/* Legend as Filter Buttons */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                   <button 
-                    className={`category-pill ${categoryFilter === 'all' ? 'active' : ''}`}
-                    onClick={() => setCategoryFilter('all')}
-                    style={{ borderColor: '#3b82f6', background: categoryFilter === 'all' ? '#3b82f6' : 'rgba(59,130,246,0.1)', color: categoryFilter === 'all' ? '#fff' : '#3b82f6' }}
+                    onClick={() => setSelectedCategory('All')} 
+                    style={{ padding: '6px 12px', borderRadius: '20px', border: selectedCategory === 'All' ? '2px solid #4f46e5' : '1px solid #e5e7eb', background: selectedCategory === 'All' ? '#eff6ff' : '#fff', color: selectedCategory === 'All' ? '#4f46e5' : '#6b7280', fontSize: '13px', fontWeight: 600, cursor: 'pointer', transition: 'all 0.2s' }}
                   >
                     Tümü
                   </button>
                   {CATEGORIES.map(c => (
                     <button 
                       key={c}
-                      className={`category-pill ${categoryFilter === c ? 'active' : ''}`}
-                      onClick={() => setCategoryFilter(c)}
-                      style={{ borderColor: CATEGORY_COLORS[c], background: categoryFilter === c ? CATEGORY_COLORS[c] : `${CATEGORY_COLORS[c]}15`, color: categoryFilter === c ? '#fff' : CATEGORY_COLORS[c] }}
+                      onClick={() => setSelectedCategory(c)}
+                      style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', borderRadius: '20px', border: selectedCategory === c ? `2px solid ${CATEGORY_COLORS[c]}` : '1px solid #e5e7eb', background: selectedCategory === c ? `${CATEGORY_COLORS[c]}15` : '#fff', color: '#4b5563', fontSize: '13px', fontWeight: 600, cursor: 'pointer', transition: 'all 0.2s' }}
                     >
-                      {c}
+                      <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: CATEGORY_COLORS[c] }}></span>
+                      {c.charAt(0).toUpperCase() + c.slice(1)}
                     </button>
                   ))}
-                  <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
-                    <button 
-                      onClick={() => { const el = document.getElementById('pin-search-input'); if(el) { el.style.display = el.style.display === 'none' ? 'block' : 'none'; if(el.style.display === 'block') el.focus(); } }}
-                      style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 9999, padding: '5px 10px', cursor: 'pointer', color: 'var(--text-muted)', fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                      title="Pin Ara"
-                    >🔍</button>
-                    <input 
-                      id="pin-search-input"
-                      placeholder="Pin ara..." 
-                      value={pinSearch} 
-                      onChange={e => setPinSearch(e.target.value)}
-                      style={{ display: pinSearch ? 'block' : 'none', padding: '5px 10px', borderRadius: 9999, border: '1px solid var(--border-color)', background: 'var(--bg-card)', color: 'var(--text-main)', width: 120, fontSize: 12 }}
-                    />
-                  </div>
                 </div>
               </div>
 
-              <TransformWrapper
-                initialScale={1}
-                minScale={1}
-                maxScale={10}
-                limitToBounds={true}
-                centerZoomedOut={true}
-                disabled={addingPin && !newPinCoords}
-                pinch={{ disabled: true }}
-                wheel={{ disabled: true }}
-                doubleClick={{ disabled: true }}
-              >
-                {({ zoomIn, zoomOut, resetTransform }) => (
-                  <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+              <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
+                <TransformWrapper
+                  initialScale={1}
+                  minScale={1}
+                  maxScale={10}
+                  limitToBounds={true}
+                  centerZoomedOut={true}
+                  disabled={addingPin && !newPinCoords}
+                  pinch={{ disabled: true }}
+                  wheel={{ disabled: true }}
+                  doubleClick={{ disabled: true }}
+                >
+                  {({ zoomIn, zoomOut, resetTransform }) => (
+                    <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}>
                     
-                    {/* Lejant (Kategori Renkleri) kaldırıldı - Üstteki butonlar yerine geçiyor */}
 
-                    <div className="zoom-controls">
+
+                    <div className="zoom-controls" style={{ bottom: 24, right: 24, background: '#fff', borderRadius: '12px', border: '1px solid #f1f5f9', boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}>
                       <button className="zoom-btn" onClick={() => zoomIn()}>+</button>
                       <button className="zoom-btn" onClick={() => zoomOut()}>-</button>
                       <button className="zoom-btn" onClick={() => resetTransform()}>⟲</button>
                       <button className="zoom-btn" onClick={() => setMapRotation(prev => (prev + 90) % 360)} title="Döndür">↻</button>
                     </div>
-                    <TransformComponent wrapperStyle={{ width: "100%", height: "100%", backgroundColor: "var(--bg-main)", cursor: (addingPin && !newPinCoords) ? 'crosshair' : 'grab' }}>
+                    
+                    <TransformComponent wrapperStyle={{ width: "100%", height: "100%", cursor: (addingPin && !newPinCoords && viewMode === 'edit') ? 'crosshair' : 'grab', backgroundColor: '#f8f9fa', backgroundImage: 'linear-gradient(to right, #e2e8f0 1px, transparent 1px), linear-gradient(to bottom, #e2e8f0 1px, transparent 1px)', backgroundSize: '20px 20px' }} contentStyle={{ width: "100%", height: "max-content" }}>
                       <div
                         className={`floor-plan-wrapper ${addingPin && !newPinCoords ? 'crosshair' : ''}`}
                         onClick={handleImageClick}
@@ -596,9 +566,9 @@ export default function ProjectDetail() {
                         onTouchMove={handlePointerMove}
                         onTouchEnd={handlePointerUp}
                         ref={imageRef}
-                        style={{ position: 'relative', display: 'flex', justifyContent: 'center', alignItems: 'center', width: '100%', height: '100%', transform: `rotate(${mapRotation}deg)`, transition: 'transform 0.3s ease' }}
+                        style={{ position: 'relative', width: '100%', height: 'auto', transform: `rotate(${mapRotation}deg)`, transition: 'transform 0.3s ease' }}
                       >
-                        <img src={floorPlans[activeFloor]?.imageUrl} alt="Kat Planı" draggable={false} style={{ display: 'block', maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
+                        <img src={floorPlans[activeFloor]?.imageUrl} alt="Kat Planı" draggable={false} style={{ display: 'block', width: '100%', height: 'auto' }} />
                         {currentFloorPins.map(pin => {
                           const isDragging = draggingPin?.id === pin.id;
                           const currentX = isDragging ? draggingPin.x : pin.x;
@@ -654,6 +624,7 @@ export default function ProjectDetail() {
                   </div>
                 )}
               </TransformWrapper>
+              </div>
             </div>
           )}
         </div>
@@ -709,43 +680,57 @@ export default function ProjectDetail() {
       )}
 
       {activeTab === 'info' && (
-        <div className="info-view" style={{ padding: '20px', maxWidth: '900px', margin: '0 auto' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-            <h2 style={{ margin: 0, color: 'var(--text-main)' }}>Proje Detayları</h2>
-            {isManager && !editingInfo && (
-              <button className="btn-secondary" onClick={() => setEditingInfo(true)} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                ✏️ Düzenle
+        <div className="info-view" style={{ flex: 1, padding: '24px', background: '#f8f9fa', display: 'flex', flexDirection: 'column', gap: '24px', overflowY: 'auto' }}>
+          
+          {/* Top Breadcrumb & Title */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '8px' }}>
+            <div>
+              <div style={{ fontSize: '13px', color: '#6b7280', marginBottom: '8px' }}>
+                Projeler <span style={{ margin: '0 4px' }}>&gt;</span> <span style={{ color: '#4f46e5', fontWeight: 600 }}>{project.name}</span>
+              </div>
+              <h2 style={{ margin: 0, fontSize: '28px', fontWeight: 800, color: '#111827' }}>Proje Detayları</h2>
+            </div>
+            <div style={{ display: 'flex', gap: '12px' }}>
+              <button 
+                onClick={() => {
+                  navigator.clipboard.writeText(window.location.href);
+                  alert('Proje bağlantısı kopyalandı!');
+                }}
+                style={{ padding: '8px 16px', background: '#fff', border: '1px solid #d1d5db', borderRadius: '8px', color: '#374151', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}
+              >
+                <Share2 size={16} /> Paylaş
               </button>
-            )}
+              {isManager && (
+                <button onClick={() => setEditingInfo(!editingInfo)} style={{ padding: '8px 16px', background: '#4f46e5', border: 'none', borderRadius: '8px', color: '#fff', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}>
+                  <Edit2 size={16} /> Düzenle
+                </button>
+              )}
+            </div>
           </div>
 
           {editingInfo ? (
-            <div className="info-form" style={{ display: 'flex', flexDirection: 'column', gap: 16, background: 'var(--bg-card)', padding: 24, borderRadius: 12, border: '1px solid var(--border-color)' }}>
+            <div className="info-form" style={{ display: 'flex', flexDirection: 'column', gap: 16, background: '#fff', padding: 24, borderRadius: 16, border: '1px solid #e5e7eb' }}>
               <div>
-                <label style={{ display: 'block', marginBottom: 6, fontWeight: 600, color: 'var(--text-muted)' }}>Proje Adı</label>
-                <input style={{ width: '100%', padding: 10, borderRadius: 8, border: '1px solid var(--border-color)', background: 'var(--bg-main)', color: 'var(--text-main)' }} value={projectInfo.name || ''} onChange={e => setProjectInfo({...projectInfo, name: e.target.value})} />
+                <label style={{ display: 'block', marginBottom: 6, fontWeight: 600, color: '#4b5563' }}>Proje Adı</label>
+                <input style={{ width: '100%', padding: 10, borderRadius: 8, border: '1px solid #d1d5db', background: '#fff', color: '#111827' }} value={projectInfo.name || ''} onChange={e => setProjectInfo({...projectInfo, name: e.target.value})} />
               </div>
               <div>
-                <label style={{ display: 'block', marginBottom: 6, fontWeight: 600, color: 'var(--text-muted)' }}>Kısa Açıklama</label>
-                <input style={{ width: '100%', padding: 10, borderRadius: 8, border: '1px solid var(--border-color)', background: 'var(--bg-main)', color: 'var(--text-main)' }} value={projectInfo.description || ''} onChange={e => setProjectInfo({...projectInfo, description: e.target.value})} />
-              </div>
-              <div>
-                <label style={{ display: 'block', marginBottom: 6, fontWeight: 600, color: 'var(--text-muted)' }}>Açık Adres</label>
-                <textarea style={{ width: '100%', padding: 10, borderRadius: 8, border: '1px solid var(--border-color)', background: 'var(--bg-main)', color: 'var(--text-main)' }} rows={2} value={projectInfo.address || ''} onChange={e => setProjectInfo({...projectInfo, address: e.target.value})} />
+                <label style={{ display: 'block', marginBottom: 6, fontWeight: 600, color: '#4b5563' }}>Açık Adres</label>
+                <textarea style={{ width: '100%', padding: 10, borderRadius: 8, border: '1px solid #d1d5db', background: '#fff', color: '#111827' }} rows={2} value={projectInfo.address || ''} onChange={e => setProjectInfo({...projectInfo, address: e.target.value})} />
               </div>
               
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16 }}>
                 <div>
-                  <label style={{ display: 'block', marginBottom: 6, fontWeight: 600, color: 'var(--text-muted)' }}>Başlangıç Tarihi</label>
-                  <input style={{ width: '100%', padding: 10, borderRadius: 8, border: '1px solid var(--border-color)', background: 'var(--bg-main)', color: 'var(--text-main)' }} type="date" value={projectInfo.startDate || ''} onChange={e => setProjectInfo({...projectInfo, startDate: e.target.value})} />
+                  <label style={{ display: 'block', marginBottom: 6, fontWeight: 600, color: '#4b5563' }}>Başlangıç Tarihi</label>
+                  <input style={{ width: '100%', padding: 10, borderRadius: 8, border: '1px solid #d1d5db', background: '#fff', color: '#111827' }} type="date" value={projectInfo.startDate || ''} onChange={e => setProjectInfo({...projectInfo, startDate: e.target.value})} />
                 </div>
                 <div>
-                  <label style={{ display: 'block', marginBottom: 6, fontWeight: 600, color: 'var(--text-muted)' }}>Hedef Bitiş</label>
-                  <input style={{ width: '100%', padding: 10, borderRadius: 8, border: '1px solid var(--border-color)', background: 'var(--bg-main)', color: 'var(--text-main)' }} type="date" value={projectInfo.endDate || ''} onChange={e => setProjectInfo({...projectInfo, endDate: e.target.value})} />
+                  <label style={{ display: 'block', marginBottom: 6, fontWeight: 600, color: '#4b5563' }}>Hedef Bitiş</label>
+                  <input style={{ width: '100%', padding: 10, borderRadius: 8, border: '1px solid #d1d5db', background: '#fff', color: '#111827' }} type="date" value={projectInfo.endDate || ''} onChange={e => setProjectInfo({...projectInfo, endDate: e.target.value})} />
                 </div>
                 <div>
-                  <label style={{ display: 'block', marginBottom: 6, fontWeight: 600, color: 'var(--text-muted)' }}>Durum</label>
-                  <select value={projectInfo.status || 'devam ediyor'} onChange={e => setProjectInfo({...projectInfo, status: e.target.value})} style={{ width: '100%', padding: 10, borderRadius: 8, border: '1px solid var(--border-color)', background: 'var(--bg-main)', color: 'var(--text-main)' }}>
+                  <label style={{ display: 'block', marginBottom: 6, fontWeight: 600, color: '#4b5563' }}>Durum</label>
+                  <select value={projectInfo.status || 'devam ediyor'} onChange={e => setProjectInfo({...projectInfo, status: e.target.value})} style={{ width: '100%', padding: 10, borderRadius: 8, border: '1px solid #d1d5db', background: '#fff', color: '#111827' }}>
                     <option value="planlama">🏗️ Planlama</option>
                     <option value="devam ediyor">🚧 Devam Ediyor</option>
                     <option value="duraklatıldı">⏸️ Duraklatıldı</option>
@@ -753,172 +738,218 @@ export default function ProjectDetail() {
                   </select>
                 </div>
                 <div>
-                  <label style={{ display: 'block', marginBottom: 6, fontWeight: 600, color: 'var(--text-muted)' }}>İlerleme Yüzdesi (%)</label>
-                  <input style={{ width: '100%', padding: 10, borderRadius: 8, border: '1px solid var(--border-color)', background: 'var(--bg-main)', color: 'var(--text-main)' }} type="number" min="0" max="100" value={projectInfo.progress || 0} onChange={e => setProjectInfo({...projectInfo, progress: Number(e.target.value)})} />
+                  <label style={{ display: 'block', marginBottom: 6, fontWeight: 600, color: '#4b5563' }}>İlerleme Yüzdesi (%)</label>
+                  <input style={{ width: '100%', padding: 10, borderRadius: 8, border: '1px solid #d1d5db', background: '#fff', color: '#111827' }} type="number" min="0" max="100" value={projectInfo.progress || 0} onChange={e => setProjectInfo({...projectInfo, progress: Number(e.target.value)})} />
                 </div>
               </div>
               
               <div>
-                <label style={{ display: 'block', marginBottom: 6, fontWeight: 600, color: 'var(--text-muted)' }}>Genel Notlar</label>
-                <textarea style={{ width: '100%', padding: 10, borderRadius: 8, border: '1px solid var(--border-color)', background: 'var(--bg-main)', color: 'var(--text-main)' }} value={projectInfo.notes || ''} onChange={e => setProjectInfo({...projectInfo, notes: e.target.value})} rows={4} />
+                <label style={{ display: 'block', marginBottom: 6, fontWeight: 600, color: '#4b5563' }}>Genel Notlar</label>
+                <textarea style={{ width: '100%', padding: 10, borderRadius: 8, border: '1px solid #d1d5db', background: '#fff', color: '#111827' }} value={projectInfo.notes || ''} onChange={e => setProjectInfo({...projectInfo, notes: e.target.value})} rows={4} />
               </div>
               
               <div style={{ display: 'flex', gap: 12, marginTop: 16 }}>
-                <button className="btn-primary" onClick={saveProjectInfo} style={{ flex: 1 }}>Kaydet</button>
-                <button className="btn-secondary" onClick={() => setEditingInfo(false)} style={{ flex: 1 }}>İptal</button>
+                <button className="btn-primary" onClick={saveProjectInfo} style={{ flex: 1, padding: '10px', borderRadius: '8px', background: '#4f46e5', color: '#fff', fontWeight: 600, border: 'none' }}>Kaydet</button>
+                <button className="btn-secondary" onClick={() => setEditingInfo(false)} style={{ flex: 1, padding: '10px', borderRadius: '8px', background: '#fff', color: '#4b5563', fontWeight: 600, border: '1px solid #d1d5db' }}>İptal</button>
               </div>
             </div>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-              
-              {/* Progress and Status Card */}
-              <div style={{ background: 'var(--bg-card)', padding: 24, borderRadius: 16, border: '1px solid var(--border-color)', boxShadow: 'var(--shadow-sm)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-                  <span className={`status-label ${project.status?.toLowerCase().replace(' ', '') || 'devamediyor'}`} style={{ fontSize: 13, padding: '4px 12px', borderRadius: 20 }}>
-                    {project.status?.toUpperCase() || 'DEVAM EDİYOR'}
-                  </span>
-                  <span style={{ fontSize: 24, fontWeight: 800, color: 'var(--primary-color)' }}>%{project.progress || 0}</span>
-                </div>
-                <div style={{ width: '100%', height: 8, background: 'var(--bg-secondary)', borderRadius: 4, overflow: 'hidden' }}>
-                  <div style={{ width: `${project.progress || 0}%`, height: '100%', background: 'var(--primary-gradient)', borderRadius: 4, transition: 'all 0.5s ease-out' }} />
-                </div>
-                <p style={{ marginTop: 16, color: 'var(--text-main)', fontSize: 16, lineHeight: 1.5 }}>{project.description || 'Proje açıklaması girilmemiş.'}</p>
-              </div>
-
-              {/* Info Grid */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: 16 }}>
-                <div style={{ background: 'var(--bg-card)', padding: 16, borderRadius: 12, border: '1px solid var(--border-color)' }}>
-                  <div style={{ fontSize: 20, marginBottom: 8 }}>📍</div>
-                  <div style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5 }}>Adres</div>
-                  <div style={{ marginTop: 4, color: 'var(--text-main)', fontWeight: 500 }}>{project.address || 'Belirtilmemiş'}</div>
-                </div>
-                <div style={{ background: 'var(--bg-card)', padding: 16, borderRadius: 12, border: '1px solid var(--border-color)' }}>
-                  <div style={{ fontSize: 20, marginBottom: 8 }}>📅</div>
-                  <div style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5 }}>Tarihler</div>
-                  <div style={{ marginTop: 4, color: 'var(--text-main)', fontWeight: 500 }}>
-                    {project.startDate || '-'} <br/> {project.endDate ? `Hedef: ${project.endDate}` : ''}
-                  </div>
-                </div>
-                <div style={{ background: 'var(--bg-card)', padding: 16, borderRadius: 12, border: '1px solid var(--border-color)' }}>
-                  <div style={{ fontSize: 20, marginBottom: 8 }}>📝</div>
-                  <div style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5 }}>Notlar</div>
-                  <div style={{ marginTop: 4, color: 'var(--text-main)', fontSize: 13, maxHeight: 60, overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                    {project.notes || 'Not yok.'}
-                  </div>
-                </div>
-              </div>
-
-              {/* DRIVE FOLDER SYSTEM */}
-              <div style={{ background: 'var(--bg-card)', borderRadius: 16, border: '1px solid var(--border-color)', overflow: 'hidden' }}>
-                <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-surface)' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                    <span style={{ fontSize: 24 }}>📁</span>
-                    <h3 style={{ margin: 0, color: 'var(--text-main)' }}>Proje Dosyaları</h3>
-                  </div>
-                  
-                  <div style={{ display: 'flex', gap: 12 }}>
-                    {!activeFolder ? (
-                       isManager && (
-                         <button onClick={createNewFolder} className="btn-secondary" style={{ padding: '6px 12px', fontSize: 13, borderRadius: 8 }}>
-                           ➕ Yeni Klasör
-                         </button>
-                       )
-                    ) : (
-                       isManager && (
-                         <label className="btn-primary" style={{ padding: '6px 12px', fontSize: 13, borderRadius: 8, cursor: 'pointer' }}>
-                           {uploadingProjectFile ? 'Yükleniyor...' : '📄 Dosya Yükle'}
-                           <input type="file" hidden onChange={uploadProjectFile} />
-                         </label>
-                       )
-                    )}
-                  </div>
-                </div>
+            <div style={{ display: 'flex', gap: '24px', flexWrap: 'wrap' }}>
+              {/* Left Column */}
+              <div style={{ flex: '1 1 0%', minWidth: '400px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
                 
-                <div style={{ padding: 24 }}>
-                  {!activeFolder ? (
-                    // KÖK DİZİN (KLASÖRLER)
+                {/* Top Card: Status & Progress */}
+                <div style={{ background: '#fff', padding: '32px', borderRadius: '16px', border: '1px solid #e5e7eb', boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
                     <div>
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 16 }}>
-                        {/* Tüm projelerde varsayılan 'Genel' klasörü gibi davranacak ana alan */}
-                        <div 
-                          onClick={() => setActiveFolder('Genel Dosyalar')}
-                          style={{ background: 'var(--bg-main)', border: '1px solid var(--border-color)', borderRadius: 12, padding: 20, textAlign: 'center', cursor: 'pointer', transition: 'all 0.2s' }}
-                          className="folder-card"
-                        >
-                          <div style={{ fontSize: 40, marginBottom: 8 }}>📁</div>
-                          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-main)' }}>Genel Dosyalar</div>
-                        </div>
-
-                        {(project.projectFolders || []).map((folder, i) => (
-                          <div key={i} style={{ position: 'relative' }}>
-                            <div 
-                              onClick={() => setActiveFolder(folder)}
-                              style={{ background: 'var(--bg-main)', border: '1px solid var(--border-color)', borderRadius: 12, padding: 20, textAlign: 'center', cursor: 'pointer', transition: 'all 0.2s' }}
-                              className="folder-card"
-                            >
-                              <div style={{ fontSize: 40, marginBottom: 8 }}>📂</div>
-                              <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-main)' }}>{folder}</div>
-                            </div>
-                            {isManager && (
-                              <button 
-                                onClick={() => deleteFolder(folder)}
-                                style={{ position: 'absolute', top: -8, right: -8, background: '#ef4444', color: 'white', border: 'none', borderRadius: '50%', width: 24, height: 24, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: 12, boxShadow: '0 2px 4px rgba(0,0,0,0.2)' }}
-                                title="Klasörü Sil"
-                              >✕</button>
-                            )}
-                          </div>
-                        ))}
+                      <h2 style={{ margin: '0 0 12px 0', fontSize: '24px', color: '#111827' }}>{project.name}</h2>
+                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '4px 12px', background: '#e0f2fe', color: '#0284c7', borderRadius: '20px', fontSize: '11px', fontWeight: 800, letterSpacing: '0.05em' }}>
+                        <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#0284c7' }} />
+                        {(project.status || 'DEVAM EDİYOR').toUpperCase()}
                       </div>
                     </div>
-                  ) : (
-                    // KLASÖR İÇİ (DOSYALAR)
-                    <div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20, paddingBottom: 16, borderBottom: '1px dashed var(--border-color)' }}>
-                        <button onClick={() => setActiveFolder(null)} style={{ background: 'transparent', border: 'none', color: 'var(--primary-color)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, fontWeight: 600, padding: 0 }}>
-                          <ArrowLeft size={16} /> Klasörler
-                        </button>
-                        <span style={{ color: 'var(--text-muted)' }}>/</span>
-                        <span style={{ color: 'var(--text-main)', fontWeight: 600 }}>{activeFolder}</span>
+                    <div style={{ textAlign: 'right' }}>
+                      <div style={{ fontSize: '40px', fontWeight: 800, color: '#4f46e5', lineHeight: 1 }}>%{project.progress || 0}</div>
+                      <div style={{ fontSize: '13px', color: '#6b7280', fontWeight: 600, marginTop: '4px' }}>Tamamlanma Oranı</div>
+                    </div>
+                  </div>
+                  <div style={{ width: '100%', height: '8px', background: '#eef2ff', borderRadius: '4px', overflow: 'hidden' }}>
+                    <div style={{ width: `${project.progress || 0}%`, height: '100%', background: '#4f46e5', borderRadius: '4px' }} />
+                  </div>
+                </div>
+
+                {/* Middle Row: Adres and Tarihler */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '24px' }}>
+                  <div style={{ background: '#fff', padding: '24px', borderRadius: '16px', border: '1px solid #e5e7eb', boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }}>
+                    <h3 style={{ margin: '0 0 16px 0', fontSize: '16px', color: '#4f46e5', display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 600 }}>
+                      <MapPin size={20} /> Adres
+                    </h3>
+                    <div style={{ color: '#374151', fontSize: '14px', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>
+                      {project.address || 'Adres bilgisi girilmemiş.'}
+                    </div>
+                  </div>
+                  <div style={{ background: '#fff', padding: '24px', borderRadius: '16px', border: '1px solid #e5e7eb', boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }}>
+                    <h3 style={{ margin: '0 0 16px 0', fontSize: '16px', color: '#0ea5e9', display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 600 }}>
+                      <Calendar size={20} /> Tarihler
+                    </h3>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', fontSize: '14px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span style={{ color: '#6b7280' }}>Başlangıç:</span>
+                        <span style={{ color: '#111827', fontWeight: 600 }}>{project.startDate ? new Date(project.startDate).toLocaleDateString('tr-TR', { day: '2-digit', month: 'long', year: 'numeric' }) : '-'}</span>
                       </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span style={{ color: '#6b7280' }}>Bitiş (Hedef):</span>
+                        <span style={{ color: '#111827', fontWeight: 600 }}>{project.endDate ? new Date(project.endDate).toLocaleDateString('tr-TR', { day: '2-digit', month: 'long', year: 'numeric' }) : '-'}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
 
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                        {(() => {
-                          const filesInView = (project.projectFiles || []).filter(f => 
-                            (activeFolder === 'Genel Dosyalar' && (!f.folder || f.folder === 'Genel Dosyalar')) || 
-                            f.folder === activeFolder
-                          );
+                {/* Bottom Card: Notlar */}
+                <div style={{ background: '#fff', padding: '24px', borderRadius: '16px', border: '1px solid #e5e7eb', boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }}>
+                  <h3 style={{ margin: '0 0 16px 0', fontSize: '16px', color: '#d97706', display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 600 }}>
+                    <AlignLeft size={20} /> Notlar
+                  </h3>
+                  <blockquote style={{ borderLeft: '4px solid #fcd34d', paddingLeft: '16px', color: '#4b5563', fontStyle: 'italic', margin: 0, fontSize: '14px', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>
+                    "{project.notes || 'Henüz not eklenmemiş.'}"
+                  </blockquote>
+                </div>
+              </div>
 
-                          if (filesInView.length === 0) {
-                            return <div style={{ padding: 32, textAlign: 'center', color: 'var(--text-muted)' }}>Bu klasör boş.</div>;
-                          }
+              {/* Right Sidebar - Files (Drive Logic) */}
+              <div style={{ flex: '0 0 420px', background: '#f8fafc', padding: '24px', borderRadius: '16px', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    {activeFolder && (
+                      <button onClick={() => setActiveFolder(null)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '32px', height: '32px', borderRadius: '8px', background: '#e0e7ff', border: 'none', cursor: 'pointer', color: '#4f46e5' }} title="Geri Dön">
+                        <ArrowLeft size={18} />
+                      </button>
+                    )}
+                    <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#111827' }}>
+                      {activeFolder ? activeFolder : 'Proje Dosyaları'}
+                    </h3>
+                  </div>
+                  <button onClick={() => setActiveTab('files')} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#4f46e5' }}>
+                    <MoreVertical size={20} />
+                  </button>
+                </div>
 
-                          return filesInView.map((f, i) => (
-                            <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-main)', padding: '12px 16px', borderRadius: 8, border: '1px solid var(--border-color)' }}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 12, overflow: 'hidden' }}>
-                                <span style={{ fontSize: 20 }}>📄</span>
-                                <span style={{ fontSize: 14, color: 'var(--text-main)', fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '200px' }} title={f.name}>{f.name}</span>
-                              </div>
-                              <div style={{ display: 'flex', gap: 8 }}>
-                                <a href={f.url} target="_blank" rel="noreferrer" className="btn-primary" style={{ padding: '6px 16px', textDecoration: 'none', fontSize: 12, borderRadius: 6 }}>Aç</a>
-                                {isManager && (
-                                  <button className="btn-danger" style={{ padding: '6px 12px', fontSize: 12, borderRadius: 6 }} onClick={async () => {
-                                    if (window.confirm('Dosyayı silmek istediğinize emin misiniz?')) {
-                                      const updatedFiles = project.projectFiles.filter(pf => pf.url !== f.url);
-                                      await updateDoc(doc(db, 'projects', projectId), { projectFiles: updatedFiles });
-                                      fetchProject();
-                                    }
-                                  }}>Sil</button>
-                                )}
-                              </div>
+                <div style={{ display: 'flex', gap: '12px', marginBottom: '24px' }}>
+                  {isManager && !activeFolder && (
+                    <button onClick={createNewFolder} style={{ flex: 1, padding: '16px 8px', background: '#eef2ff', border: '1px dashed #a5b4fc', borderRadius: '12px', color: '#4f46e5', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', cursor: 'pointer', transition: 'background 0.2s' }}>
+                      <FolderPlus size={24} />
+                      <span style={{ fontSize: '12px', fontWeight: 600 }}>Yeni Klasör</span>
+                    </button>
+                  )}
+                  {isManager && (
+                    <label style={{ flex: 1, padding: '16px 8px', background: '#fff', border: '1px solid #cbd5e1', borderRadius: '12px', color: '#1e293b', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', cursor: 'pointer', transition: 'background 0.2s' }}>
+                      <Upload size={24} />
+                      <span style={{ fontSize: '12px', fontWeight: 600 }}>{uploadingProjectFile ? 'Yükleniyor...' : 'Dosya Yükle'}</span>
+                      <input type="file" hidden onChange={uploadProjectFile} />
+                    </label>
+                  )}
+                </div>
+
+                <div style={{ flex: 1, overflowY: 'auto' }}>
+                  {!activeFolder ? (
+                    // ROOT FOLDER VIEW
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      {/* List Folders */}
+                      {(project.projectFolders || []).map((folder, i) => {
+                        const filesInFolder = (project.projectFiles || []).filter(f => f.folder === folder).length;
+                        return (
+                          <div key={i} onClick={() => setActiveFolder(folder)} style={{ display: 'flex', alignItems: 'center', gap: '16px', cursor: 'pointer', background: '#fff', padding: '12px', borderRadius: '12px', border: '1px solid #e2e8f0', transition: 'all 0.2s', boxShadow: '0 1px 2px rgba(0,0,0,0.02)' }} className="folder-item-hover">
+                            <div style={{ width: '48px', height: '48px', background: '#0ea5e9', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff' }}>
+                               <FolderPlus size={24} />
                             </div>
-                          ));
-                        })()}
+                            <div style={{ flex: 1 }}>
+                              <div style={{ fontSize: '14px', fontWeight: 600, color: '#111827' }}>{folder}</div>
+                              <div style={{ fontSize: '11px', color: '#6b7280' }}>{filesInFolder} Dosya</div>
+                            </div>
+                            {isManager && (
+                              <button onClick={(e) => { e.stopPropagation(); deleteFolder(folder); }} style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '8px' }}>✕</button>
+                            )}
+                          </div>
+                        );
+                      })}
+                      
+                      {/* Default "Diğer Dosyalar" Folder for root files */}
+                      <div 
+                        onClick={() => setActiveFolder('Genel Dosyalar')}
+                        style={{ display: 'flex', alignItems: 'center', gap: '16px', cursor: 'pointer', background: '#fff', padding: '12px', borderRadius: '12px', border: '1px solid #e2e8f0', transition: 'all 0.2s', boxShadow: '0 1px 2px rgba(0,0,0,0.02)' }}
+                        className="folder-item-hover"
+                      >
+                        <div style={{ width: '48px', height: '48px', background: '#0ea5e9', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff' }}>
+                          <FolderPlus size={24} />
+                        </div>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontSize: '14px', fontWeight: 600, color: '#111827' }}>Diğer Dosyalar</div>
+                          <div style={{ fontSize: '11px', color: '#6b7280' }}>Ana Dizin ({((project.projectFiles || []).filter(f => !f.folder || f.folder === 'Genel Dosyalar').length)})</div>
+                        </div>
                       </div>
+
+                      {/* Recent Files Preview */}
+                      <div style={{ fontSize: '11px', fontWeight: 800, color: '#94a3b8', margin: '24px 0 12px 0', letterSpacing: '0.05em' }}>SON EKLENEN DOSYALAR</div>
+                      {(project.projectFiles || []).slice(0, 3).map((f, i) => (
+                        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px', background: '#fee2e2', borderRadius: '12px', marginBottom: '8px' }}>
+                          <div style={{ width: '36px', height: '36px', background: '#fecaca', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#dc2626' }}>
+                            <FileText size={18} />
+                          </div>
+                          <div style={{ flex: 1 }}>
+                            <div style={{ fontSize: '13px', fontWeight: 600, color: '#111827', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '140px' }}>{f.name}</div>
+                            <div style={{ fontSize: '11px', color: '#6b7280' }}>{f.folder || 'Ana Dizin'}</div>
+                          </div>
+                          <a href={f.url} target="_blank" rel="noreferrer" style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#4b5563', textDecoration: 'none', display: 'flex', alignItems: 'center' }}>
+                            <Download size={18} />
+                          </a>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    // INSIDE FOLDER VIEW
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      {(() => {
+                        const filesInCurrentFolder = (project.projectFiles || []).filter(f => f.folder === activeFolder || (!f.folder && activeFolder === 'Genel Dosyalar'));
+                        if (filesInCurrentFolder.length === 0) {
+                          return <div style={{ padding: '24px', textAlign: 'center', color: '#94a3b8', fontSize: '13px' }}>Bu klasörde henüz dosya yok.</div>;
+                        }
+                        return filesInCurrentFolder.map((f, i) => (
+                          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px', background: '#fff', border: '1px solid #e2e8f0', borderRadius: '12px' }}>
+                            <div style={{ width: '36px', height: '36px', background: '#f1f5f9', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b' }}>
+                              <FileText size={18} />
+                            </div>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ fontSize: '13px', fontWeight: 600, color: '#111827', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{f.name}</div>
+                            </div>
+                            <div style={{ display: 'flex', gap: '8px' }}>
+                              <a href={f.url} target="_blank" rel="noreferrer" style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#4b5563', textDecoration: 'none', display: 'flex', alignItems: 'center', padding: '4px' }}>
+                                <Download size={18} />
+                              </a>
+                              {isManager && (
+                                <button onClick={() => {
+                                  if (window.confirm('Dosyayı silmek istediğinize emin misiniz?')) {
+                                    const updatedFiles = project.projectFiles.filter(pf => pf !== f);
+                                    updateDoc(doc(db, 'projects', projectId), { projectFiles: updatedFiles }).then(() => fetchProject());
+                                  }
+                                }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#ef4444', padding: '4px' }}>
+                                  <Trash2 size={18} />
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        ));
+                      })()}
                     </div>
                   )}
                 </div>
+                
+                <style>{`
+                  .folder-item-hover:hover {
+                    border-color: #bae6fd !important;
+                    background-color: #f0f9ff !important;
+                  }
+                `}</style>
               </div>
-
             </div>
           )}
         </div>

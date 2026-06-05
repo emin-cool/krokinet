@@ -129,7 +129,7 @@ export default function Login() {
                   <input type="checkbox" />
                   <span>Beni Hatırla</span>
                 </label>
-                <a href="#" className="forgot-password">Şifremi Unuttum</a>
+                <a href="#/" className="forgot-password">Şifremi Unuttum</a>
               </div>
 
               <button type="submit" className="btn-login" disabled={loading || isLockedOut}>
@@ -150,7 +150,7 @@ export default function Login() {
             </form>
 
             <p className="support-text">
-              Sisteme erişimde sorun mu yaşıyorsunuz? <a href="#">Destek ile iletişime geçin.</a>
+              Sisteme erişimde sorun mu yaşıyorsunuz? <a href="#/">Destek ile iletişime geçin.</a>
             </p>
           </div>
         </div>

@@ -1,24 +1,81 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { RefreshCw, DollarSign, Euro, Circle, Square, Triangle, Download, Search, Settings } from 'lucide-react';
-import NotificationsDropdown from '../components/NotificationsDropdown';
+import { RefreshCw, DollarSign, Circle, Square, Triangle, Download, Search, Settings } from 'lucide-react';
 
 export default function MarketPrices() {
   const { userData } = useAuth();
-  const [calculator, setCalculator] = useState({ material: 'Bakır (kg)', amount: 0 });
+  const [calculator, setCalculator] = useState({ material: 'Bakır / kg', amount: 0 });
   const [lastUpdate, setLastUpdate] = useState(new Date().toLocaleTimeString('tr-TR'));
+  const [rates, setRates] = useState({ USD_TRY: 35.00, EUR_TRY: 38.00, EUR_USD: 1.08 });
+  const [isFetching, setIsFetching] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const fetchExchangeRate = async () => {
+    setIsFetching(true);
+    try {
+      const res = await fetch('https://api.exchangerate-api.com/v4/latest/USD');
+      const data = await res.json();
+      if (data && data.rates && data.rates.TRY && data.rates.EUR) {
+        const usd_try = data.rates.TRY;
+        const eur_try = usd_try / data.rates.EUR;
+        setRates({
+          USD_TRY: usd_try,
+          EUR_TRY: eur_try,
+          EUR_USD: 1 / data.rates.EUR
+        });
+        setLastUpdate(new Date().toLocaleTimeString('tr-TR'));
+      }
+    } catch (error) {
+      console.error('Döviz kuru alınamadı', error);
+    }
+    setIsFetching(false);
+  };
+
+  useEffect(() => {
+    fetchExchangeRate();
+  }, []);
 
   const refreshData = () => {
-    setLastUpdate(new Date().toLocaleTimeString('tr-TR'));
+    fetchExchangeRate();
+  };
+
+  const MATERIALS_DATA = {
+    'Metaller': [
+      { name: 'Bakır / kg', try: 11.85 * rates.USD_TRY, usd: 11.85, eur: 10.90, icon: 'O', color: '#d97706', bg: '#fffbeb' },
+      { name: 'Alüminyum / kg', try: 3.85 * rates.USD_TRY, usd: 3.85, eur: 3.55, icon: 'S', color: '#8b5cf6', bg: '#f5f3ff' },
+      { name: 'İnşaat Demiri / ton', try: 971.00 * rates.USD_TRY, usd: 971.00, eur: 890.00, icon: 'T', color: '#3b82f6', bg: '#eff6ff' }
+    ],
+    'Yapı Malzemeleri': [
+      { name: 'Hazır Beton C25 / m³', try: 100.00 * rates.USD_TRY, usd: 100.00, icon: 'S', color: '#ef4444', bg: '#fee2e2' },
+      { name: 'Hazır Beton C30 / m³', try: 108.00 * rates.USD_TRY, usd: 108.00, icon: 'S', color: '#ef4444', bg: '#fee2e2' },
+      { name: 'Kum / m³', try: 21.40 * rates.USD_TRY, usd: 21.40, icon: 'O', color: '#f59e0b', bg: '#fef3c7' },
+      { name: 'Çakıl / m³', try: 18.50 * rates.USD_TRY, usd: 18.50, icon: 'O', color: '#f59e0b', bg: '#fef3c7' },
+      { name: 'Çimento (50 kg) / adet', try: 15.70 * rates.USD_TRY, usd: 15.70, icon: 'S', color: '#64748b', bg: '#f1f5f9' },
+      { name: 'Tuğla (13.5) / 1000 adet', try: 314.00 * rates.USD_TRY, usd: 314.00, icon: 'S', color: '#ea580c', bg: '#ffedd5' },
+      { name: 'Gazbeton / m³', try: 91.40 * rates.USD_TRY, usd: 91.40, icon: 'S', color: '#94a3b8', bg: '#f8fafc' },
+    ],
+    'Ahşap & İzolasyon': [
+      { name: 'Çam Kereste / m³', try: 442.80 * rates.USD_TRY, usd: 442.80, icon: 'S', color: '#b45309', bg: '#fef3c7' },
+      { name: 'OSB 3 Levha / adet', try: 19.40 * rates.USD_TRY, usd: 19.40, icon: 'S', color: '#b45309', bg: '#fef3c7' },
+      { name: 'Plywood / adet', try: 41.40 * rates.USD_TRY, usd: 41.40, icon: 'S', color: '#b45309', bg: '#fef3c7' },
+      { name: 'Taşyünü (5cm) / m²', try: 6.00 * rates.USD_TRY, usd: 6.00, icon: 'S', color: '#14b8a6', bg: '#ccfbf1' },
+      { name: 'EPS Strafor / m²', try: 4.15 * rates.USD_TRY, usd: 4.15, icon: 'S', color: '#14b8a6', bg: '#ccfbf1' },
+      { name: 'Alçıpan / adet', try: 5.30 * rates.USD_TRY, usd: 5.30, icon: 'S', color: '#94a3b8', bg: '#f8fafc' }
+    ]
   };
 
   const calculateTotal = () => {
     if (calculator.amount <= 0) return '₺0.00';
-    let price = 0;
-    if (calculator.material.includes('Bakır')) price = 384.21;
-    if (calculator.material.includes('Demiri')) price = 27.12;
-    if (calculator.material.includes('Beton')) price = 2938.08;
-    return `₺${(calculator.amount * price).toLocaleString('tr-TR', { minimumFractionDigits: 2 })}`;
+    const selectedMaterial = Object.values(MATERIALS_DATA).flat().find(m => m.name === calculator.material);
+    const price = selectedMaterial ? selectedMaterial.try : 0;
+    return `₺${(calculator.amount * price).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  };
+
+  const getIcon = (type) => {
+    if (type === 'O') return <Circle size={20} />;
+    if (type === 'S') return <Square size={20} />;
+    if (type === 'T') return <Triangle size={20} />;
+    return <Square size={20} />;
   };
 
   return (
@@ -37,10 +94,13 @@ export default function MarketPrices() {
         </div>
 
         <div className="search-bar" style={{ position: 'relative', width: '300px' }}>
+          <Search size={18} style={{ position: 'absolute', left: 12, top: 10, color: 'var(--text-muted)' }} />
           <input 
             type="text" 
             placeholder="Search materials..." 
-            style={{ width: '100%', padding: '10px 16px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-surface)' }}
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            style={{ width: '100%', padding: '10px 16px 10px 36px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-surface)' }}
           />
         </div>
       </div>
@@ -58,8 +118,9 @@ export default function MarketPrices() {
             Döviz kurları ve inşaat malzeme fiyatları anlık küresel verilere göre hesaplanmaktadır. Proje bütçenizi gerçek zamanlı piyasa hareketlerine göre optimize edin.
           </p>
         </div>
-        <button className="btn-primary" onClick={refreshData} style={{ borderRadius: '12px', padding: '12px 24px' }}>
-          <RefreshCw size={16} style={{ marginRight: '8px' }} /> Canlı Verileri Yenile
+        <button className="btn-primary" onClick={refreshData} disabled={isFetching} style={{ borderRadius: '12px', padding: '12px 24px', opacity: isFetching ? 0.7 : 1 }}>
+          <RefreshCw size={16} style={{ marginRight: '8px', animation: isFetching ? 'spin 1s linear infinite' : 'none' }} /> 
+          {isFetching ? 'Güncelleniyor...' : 'Canlı Verileri Yenile'}
         </button>
       </div>
 
@@ -87,7 +148,7 @@ export default function MarketPrices() {
                   <div style={{ background: '#e0e7ff', color: '#4f46e5', fontWeight: 700, fontSize: '12px', padding: '4px 8px', borderRadius: '6px' }}>US</div>
                   <span style={{ fontWeight: 600 }}>USD / TRY</span>
                 </div>
-                <div style={{ fontWeight: 700, color: 'var(--primary-color)' }}>₺34.04</div>
+                <div style={{ fontWeight: 700, color: 'var(--primary-color)' }}>₺{rates.USD_TRY.toFixed(2)}</div>
               </div>
               
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -95,7 +156,7 @@ export default function MarketPrices() {
                   <div style={{ background: '#e0e7ff', color: '#4f46e5', fontWeight: 700, fontSize: '12px', padding: '4px 8px', borderRadius: '6px' }}>EU</div>
                   <span style={{ fontWeight: 600 }}>EUR / TRY</span>
                 </div>
-                <div style={{ fontWeight: 700, color: 'var(--primary-color)' }}>₺37.50</div>
+                <div style={{ fontWeight: 700, color: 'var(--primary-color)' }}>₺{rates.EUR_TRY.toFixed(2)}</div>
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -103,7 +164,7 @@ export default function MarketPrices() {
                   <div style={{ background: '#e0f2fe', color: '#0284c7', fontWeight: 700, fontSize: '12px', padding: '4px 8px', borderRadius: '6px' }}>€$</div>
                   <span style={{ fontWeight: 600 }}>EUR / USD</span>
                 </div>
-                <div style={{ fontWeight: 700, color: 'var(--primary-color)' }}>$1.1021</div>
+                <div style={{ fontWeight: 700, color: 'var(--primary-color)' }}>${rates.EUR_USD.toFixed(4)}</div>
               </div>
             </div>
           </div>
@@ -122,9 +183,9 @@ export default function MarketPrices() {
                 onChange={e => setCalculator({...calculator, material: e.target.value})}
                 style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-main)' }}
               >
-                <option>Bakır (kg)</option>
-                <option>İnşaat Demiri (ton)</option>
-                <option>Hazır Beton (m³)</option>
+                {Object.values(MATERIALS_DATA).flat().map(m => (
+                  <option key={m.name} value={m.name}>{m.name}</option>
+                ))}
               </select>
             </div>
 
@@ -156,100 +217,47 @@ export default function MarketPrices() {
         {/* Right Column */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
           
-          {/* Metaller */}
-          <div style={{ background: 'var(--bg-surface)', padding: '24px', borderRadius: '16px', border: '1px solid var(--border-color)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '24px' }}>
-              <Settings size={20} color="var(--text-muted)" />
-              <h3 style={{ margin: 0, fontSize: '16px' }}>Metaller</h3>
-            </div>
+          {Object.entries(MATERIALS_DATA).map(([category, items]) => {
+            const filteredItems = items.filter(item => 
+              item.name.toLowerCase().includes(searchQuery.toLowerCase())
+            );
+            
+            if (filteredItems.length === 0) return null;
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px', border: '1px solid var(--border-color)', borderRadius: '12px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                  <div style={{ padding: '8px', background: '#fffbeb', color: '#d97706', borderRadius: '8px' }}><Circle size={20} /></div>
-                  <div>
-                    <div style={{ fontWeight: 600 }}>Bakır / kg</div>
-                  </div>
+            return (
+              <div key={category} style={{ background: 'var(--bg-surface)', padding: '24px', borderRadius: '16px', border: '1px solid var(--border-color)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '24px' }}>
+                  <Settings size={20} color="var(--text-muted)" />
+                  <h3 style={{ margin: 0, fontSize: '16px' }}>{category}</h3>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '32px' }}>
-                  <div style={{ fontSize: '11px', color: 'var(--text-muted)', textAlign: 'right' }}>
-                    Küresel Ortalama<br/><span style={{ fontWeight: 600 }}>$8.35 | €7.18</span>
-                  </div>
-                  <div style={{ fontWeight: 700, color: 'var(--primary-color)', fontSize: '16px' }}>₺384,21</div>
-                </div>
-              </div>
 
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px', border: '1px solid var(--border-color)', borderRadius: '12px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                  <div style={{ padding: '8px', background: '#f5f3ff', color: '#8b5cf6', borderRadius: '8px' }}><Square size={20} /></div>
-                  <div>
-                    <div style={{ fontWeight: 600 }}>Alüminyum / kg</div>
-                  </div>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '32px' }}>
-                  <div style={{ fontSize: '11px', color: 'var(--text-muted)', textAlign: 'right' }}>
-                    <span style={{ fontWeight: 600 }}>$2.36 | €2.03</span>
-                  </div>
-                  <div style={{ fontWeight: 700, color: 'var(--primary-color)', fontSize: '16px' }}>₺108,48</div>
-                </div>
-              </div>
-
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px', border: '1px solid var(--border-color)', borderRadius: '12px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                  <div style={{ padding: '8px', background: '#eff6ff', color: '#3b82f6', borderRadius: '8px' }}><Triangle size={20} /></div>
-                  <div>
-                    <div style={{ fontWeight: 600 }}>İnşaat Demiri / ton</div>
-                  </div>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '32px' }}>
-                  <div style={{ fontSize: '11px', color: 'var(--text-muted)', textAlign: 'right' }}>
-                    <span style={{ fontWeight: 600 }}>$589.13 | €506.97</span>
-                  </div>
-                  <div style={{ fontWeight: 700, color: 'var(--primary-color)', fontSize: '16px' }}>₺27.120,76</div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Yapı Malzemeleri */}
-          <div style={{ background: 'var(--bg-surface)', padding: '24px', borderRadius: '16px', border: '1px solid var(--border-color)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '24px' }}>
-              <Settings size={20} color="var(--text-muted)" />
-              <h3 style={{ margin: 0, fontSize: '16px' }}>Yapı Malzemeleri</h3>
-            </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px', border: '1px solid var(--border-color)', borderRadius: '12px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                  <div style={{ padding: '8px', background: '#fee2e2', color: '#ef4444', borderRadius: '8px' }}><Square size={20} /></div>
-                  <div style={{ fontWeight: 600 }}>Hazır Beton C25 / m³</div>
-                </div>
-                <div style={{ fontWeight: 700, color: 'var(--primary-color)', fontSize: '16px' }}>₺2.938,08</div>
-              </div>
-
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px', border: '1px solid var(--border-color)', borderRadius: '12px', marginBottom: '24px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                  <div style={{ padding: '8px', background: '#fef3c7', color: '#f59e0b', borderRadius: '8px' }}><Circle size={20} /></div>
-                  <div style={{ fontWeight: 600 }}>Kum / m³</div>
-                </div>
-                <div style={{ fontWeight: 700, color: 'var(--primary-color)', fontSize: '16px' }}>₺542,42</div>
-              </div>
-              
-              {/* Trend Analizi Chart Placeholder */}
-              <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '12px' }}>
-                  <span>Fiyat Trend Analizi (Son 30 Gün)</span>
-                  <span style={{ color: 'var(--primary-color)' }}>Trend: +4.2%</span>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'flex-end', gap: '4px', height: '80px' }}>
-                  {[30, 40, 35, 50, 45, 60, 55, 70, 80].map((h, i) => (
-                    <div key={i} style={{ flex: 1, background: i === 8 ? 'var(--primary-color)' : 'rgba(99, 102, 241, 0.3)', height: `${h}%`, borderRadius: '4px 4px 0 0' }}></div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  {filteredItems.map((item, idx) => (
+                    <div key={idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px', border: '1px solid var(--border-color)', borderRadius: '12px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                        <div style={{ padding: '8px', background: item.bg, color: item.color, borderRadius: '8px' }}>
+                          {getIcon(item.icon)}
+                        </div>
+                        <div>
+                          <div style={{ fontWeight: 600 }}>{item.name}</div>
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '32px' }}>
+                        {item.usd && item.eur ? (
+                          <div style={{ fontSize: '11px', color: 'var(--text-muted)', textAlign: 'right' }}>
+                            <span style={{ fontWeight: 600 }}>${item.usd} | €{item.eur}</span>
+                          </div>
+                        ) : null}
+                        <div style={{ fontWeight: 700, color: 'var(--primary-color)', fontSize: '16px' }}>
+                          ₺{item.try.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </div>
+                      </div>
+                    </div>
                   ))}
                 </div>
               </div>
-
-            </div>
-          </div>
+            );
+          })}
 
         </div>
 
