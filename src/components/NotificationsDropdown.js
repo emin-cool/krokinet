@@ -105,7 +105,7 @@ export default function NotificationsDropdown() {
               ))
             )}
           </div>
-          <div style={{textAlign:'center',padding:'8px'}}><a href='/notifications' style={{color:'var(--primary-color)',fontSize:12,textDecoration:'none'}}>Tümünü Gör →</a></div>
+          <div style={{textAlign:'center',padding:'8px'}}><span onClick={() => { setIsOpen(false); navigate('/notifications'); }} style={{color:'var(--primary-color)',fontSize:12,cursor:'pointer'}}>Tümünü Gör →</span></div>
         </div>
       )}
     </div>

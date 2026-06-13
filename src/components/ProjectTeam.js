@@ -3,17 +3,9 @@ import React, { useState, useEffect } from 'react';
 import { db } from '../firebase';
 import { collection, getDocs, addDoc, doc, setDoc, serverTimestamp, updateDoc, arrayUnion, arrayRemove, getDoc, onSnapshot, query, limit, deleteField, deleteDoc } from 'firebase/firestore';
 import { generateStrongPassword } from '../utils/constants';
+import { firebaseConfig } from '../firebase';
 import { initializeApp, getApps } from 'firebase/app';
 import { getAuth, createUserWithEmailAndPassword } from 'firebase/auth';
-
-const firebaseConfig = {
-  apiKey: "AIzaSyDPA02P6tUmrKMVOUY_oTweDJz901hQERE",
-  authDomain: "insaat-app-70b06.firebaseapp.com",
-  projectId: "insaat-app-70b06",
-  storageBucket: "insaat-app-70b06.firebasestorage.app",
-  messagingSenderId: "632247836112",
-  appId: "1:632247836112:web:580e479e5ff9dce497edd5"
-};
 
 const secondaryApp = getApps().find(a => a.name === 'Secondary') || initializeApp(firebaseConfig, 'Secondary');
 const secondaryAuth = getAuth(secondaryApp);
@@ -111,7 +103,7 @@ export default function ProjectTeam({ projectId, isManager }) {
   }
 
   async function removeUser(userId) {
-    if (!window.confirm('Bu kullanıcıyı projeden çıkarmak ve sistemden tamamen silmek istiyor musunuz?')) return;
+    if (!window.confirm('Bu kullanıcıyı projeden çıkarmak istediğinize emin misiniz?')) return;
     const projectRef = doc(db, 'projects', projectId);
     await updateDoc(projectRef, { 
       memberIds: arrayRemove(userId),

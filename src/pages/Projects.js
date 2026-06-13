@@ -131,7 +131,7 @@ export default function Projects() {
             <p style={{ margin: '4px 0 0 0', color: 'var(--text-muted)', fontSize: '14px' }}>{currentDate}</p>
           </div>
           <div style={{ display: 'flex', gap: '12px' }}>
-            {(userData?.isSuperAdmin || true) && ( // Allowing all users to see the button for demo
+            {(userData?.isSuperAdmin) && (
               <button className="btn-primary" style={{ borderRadius: '20px', padding: '10px 20px' }} onClick={() => setShowNewProject(true)}>
                 <Plus size={16} /> New Project
               </button>
@@ -145,28 +145,28 @@ export default function Projects() {
         <button 
           className={`pill ${filter === 'all' ? 'active' : ''}`}
           onClick={() => setFilter('all')}
-          style={{ padding: '8px 16px', borderRadius: '20px', border: 'none', background: filter === 'all' ? 'var(--primary-color)' : 'var(--bg-surface)', color: filter === 'all' ? '#fff' : 'var(--text-muted)', fontWeight: 600, fontSize: '13px', cursor: 'pointer', transition: 'all 0.2s', border: filter === 'all' ? 'none' : '1px solid var(--border-color)' }}
+          style={{ padding: '8px 16px', borderRadius: '20px', background: filter === 'all' ? 'var(--primary-color)' : 'var(--bg-surface)', color: filter === 'all' ? '#fff' : 'var(--text-muted)', fontWeight: 600, fontSize: '13px', cursor: 'pointer', transition: 'all 0.2s', border: filter === 'all' ? 'none' : '1px solid var(--border-color)' }}
         >
           All Projects ({projects.length})
         </button>
         <button 
           className={`pill ${filter === 'in-progress' ? 'active' : ''}`}
           onClick={() => setFilter('in-progress')}
-          style={{ padding: '8px 16px', borderRadius: '20px', border: 'none', background: filter === 'in-progress' ? 'var(--primary-color)' : 'var(--bg-surface)', color: filter === 'in-progress' ? '#fff' : 'var(--text-muted)', fontWeight: 600, fontSize: '13px', cursor: 'pointer', transition: 'all 0.2s', border: filter === 'in-progress' ? 'none' : '1px solid var(--border-color)' }}
+          style={{ padding: '8px 16px', borderRadius: '20px', background: filter === 'in-progress' ? 'var(--primary-color)' : 'var(--bg-surface)', color: filter === 'in-progress' ? '#fff' : 'var(--text-muted)', fontWeight: 600, fontSize: '13px', cursor: 'pointer', transition: 'all 0.2s', border: filter === 'in-progress' ? 'none' : '1px solid var(--border-color)' }}
         >
           In Progress
         </button>
         <button 
           className={`pill ${filter === 'planning' ? 'active' : ''}`}
           onClick={() => setFilter('planning')}
-          style={{ padding: '8px 16px', borderRadius: '20px', border: 'none', background: filter === 'planning' ? 'var(--primary-color)' : 'var(--bg-surface)', color: filter === 'planning' ? '#fff' : 'var(--text-muted)', fontWeight: 600, fontSize: '13px', cursor: 'pointer', transition: 'all 0.2s', border: filter === 'planning' ? 'none' : '1px solid var(--border-color)' }}
+          style={{ padding: '8px 16px', borderRadius: '20px', background: filter === 'planning' ? 'var(--primary-color)' : 'var(--bg-surface)', color: filter === 'planning' ? '#fff' : 'var(--text-muted)', fontWeight: 600, fontSize: '13px', cursor: 'pointer', transition: 'all 0.2s', border: filter === 'planning' ? 'none' : '1px solid var(--border-color)' }}
         >
           Planning
         </button>
         <button 
           className={`pill ${filter === 'completed' ? 'active' : ''}`}
           onClick={() => setFilter('completed')}
-          style={{ padding: '8px 16px', borderRadius: '20px', border: 'none', background: filter === 'completed' ? 'var(--primary-color)' : 'var(--bg-surface)', color: filter === 'completed' ? '#fff' : 'var(--text-muted)', fontWeight: 600, fontSize: '13px', cursor: 'pointer', transition: 'all 0.2s', border: filter === 'completed' ? 'none' : '1px solid var(--border-color)' }}
+          style={{ padding: '8px 16px', borderRadius: '20px', background: filter === 'completed' ? 'var(--primary-color)' : 'var(--bg-surface)', color: filter === 'completed' ? '#fff' : 'var(--text-muted)', fontWeight: 600, fontSize: '13px', cursor: 'pointer', transition: 'all 0.2s', border: filter === 'completed' ? 'none' : '1px solid var(--border-color)' }}
         >
           Completed
         </button>

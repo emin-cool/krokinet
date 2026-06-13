@@ -166,7 +166,7 @@ export default function ProjectDetail() {
       updatedPlans[index] = { ...updatedPlans[index], isArchived: !currentStatus };
       await updateDoc(doc(db, 'projects', projectId), { floorPlans: updatedPlans });
       if (!currentStatus && activeFloor === index) {
-        const fallback = floorPlans.findIndex((fp, i) => i !== index && !fp.isArchived);
+        const fallback = (project.floorPlans || []).findIndex((fp, i) => i !== index && !fp.isArchived);
         setActiveFloor(fallback >= 0 ? fallback : 0);
       }
       fetchProject();
@@ -262,6 +262,7 @@ export default function ProjectDetail() {
     try {
       const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD}/auto/upload`, { method: 'POST', body: formData });
       const data = await res.json();
+      if (!res.ok || data.error) { alert('Dosya yüklenemedi.'); setUploadingProjectFile(false); return; }
       const fileUrl = data.secure_url;
       const updatedFiles = [...(project.projectFiles || []), { name: file.name, url: fileUrl, folder: activeFolder }];
       await updateDoc(doc(db, 'projects', projectId), { projectFiles: updatedFiles });
@@ -291,9 +292,9 @@ export default function ProjectDetail() {
   const handlePointerMove = (e) => {
     if (!draggingPin) return;
     const rect = imageRef.current.getBoundingClientRect();
-    const clientX = e.clientX || (e.touches && e.touches[0].clientX);
-    const clientY = e.clientY || (e.touches && e.touches[0].clientY);
-    if (!clientX) return;
+    const clientX = e.clientX ?? e.touches?.[0]?.clientX;
+    const clientY = e.clientY ?? e.touches?.[0]?.clientY;
+    if (clientX == null) return;
 
     let x = ((clientX - rect.left) / rect.width) * 100;
     let y = ((clientY - rect.top) / rect.height) * 100;
@@ -346,7 +347,7 @@ export default function ProjectDetail() {
       }
 
       setAddingPin(false);
-      setNewPinData({ title: '', category: 'genel', assignee: '' });
+      setNewPinData({ title: '', category: 'genel', color: CATEGORY_COLORS['genel'] || '#3b82f6' });
       setNewPinCoords(null);
     } catch (err) {
       alert('Pin kaydedilirken hata oluştu: ' + err.message);
@@ -375,7 +376,7 @@ export default function ProjectDetail() {
     if (p.isArchived) return false;
     if (p.floorPlanIndex !== activeFloor) return false;
     if (selectedCategory !== 'All' && p.category !== selectedCategory) return false;
-    
+
     // Filtreleme
     if (pinFilter === 'open' && p.status !== 'açık') return false;
     if (pinFilter === 'resolved' && p.status !== 'çözüldü') return false;
@@ -389,8 +390,6 @@ export default function ProjectDetail() {
       const assigneeMatch = p.assignee?.toLowerCase().includes(search);
       if (!titleMatch && !assigneeMatch) return false;
     }
-    
-    if (p.isArchived) return false;
 
     return true;
   });
@@ -432,6 +431,9 @@ export default function ProjectDetail() {
             </button>
             <button className={`tab ${activeTab === 'team' ? 'active' : ''}`} onClick={() => setActiveTab('team')} style={{ justifyContent: 'flex-start', padding: '10px 16px' }} title="Ekip Üyeleri">
               <span style={{ marginRight: '12px', fontSize: '18px' }}>👥</span> Ekip Üyeleri
+            </button>
+            <button className={`tab ${activeTab === 'schedule' ? 'active' : ''}`} onClick={() => setActiveTab('schedule')} style={{ justifyContent: 'flex-start', padding: '10px 16px' }} title="Takvim">
+              <span style={{ marginRight: '12px', fontSize: '18px' }}>📅</span> Takvim
             </button>
             {isManager && (
               <button className={`tab ${activeTab === 'archive' ? 'active' : ''}`} onClick={() => setActiveTab('archive')} style={{ justifyContent: 'flex-start', padding: '10px 16px' }} title="Arşiv">

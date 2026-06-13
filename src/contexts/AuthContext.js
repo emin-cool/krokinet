@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { auth, db } from '../firebase';
 import { onAuthStateChanged } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, onSnapshot } from 'firebase/firestore';
 
 const AuthContext = createContext();
 
@@ -16,22 +16,34 @@ export function AuthProvider({ children }) {
   const [userDataLoading, setUserDataLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+    let unsubUser = null;
+
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
       setCurrentUser(user);
+
+      if (unsubUser) { unsubUser(); unsubUser = null; }
+
       if (user) {
         setUserDataLoading(true);
-        const userDoc = await getDoc(doc(db, 'users', user.uid));
-        if (userDoc.exists()) {
-          setUserData(userDoc.data());
-        }
-        setUserDataLoading(false);
+        unsubUser = onSnapshot(doc(db, 'users', user.uid), (snap) => {
+          if (snap.exists()) {
+            setUserData(snap.data());
+          } else {
+            setUserData(null);
+          }
+          setUserDataLoading(false);
+        });
       } else {
         setUserData(null);
         setUserDataLoading(false);
       }
       setLoading(false);
     });
-    return unsubscribe;
+
+    return () => {
+      unsubscribe();
+      if (unsubUser) unsubUser();
+    };
   }, []);
 
   const value = { currentUser, userData, loading, userDataLoading };

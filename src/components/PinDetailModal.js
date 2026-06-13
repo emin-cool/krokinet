@@ -4,20 +4,11 @@ import { collection, query, where, orderBy, onSnapshot, addDoc, serverTimestamp,
 import { X, Send, Paperclip, FileText, CornerUpLeft, Search, Pin, PinOff, Info, Images, MapPin, UserCheck } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import ImageMarkupModal from './ImageMarkupModal';
+import { CATEGORY_COLORS } from '../utils/constants';
 import './PinDetailModal.css';
 
 const CLOUDINARY_PRESET = 'insaat_preset';
 const CLOUDINARY_CLOUD = 'dfl7x5dud';
-
-const CATEGORY_COLORS = {
-  'genel': '#3b82f6', 
-  'mimari': '#a855f7', 
-  'statik': '#ef4444', 
-  'elektrik': '#eab308', 
-  'tesisat': '#22c55e', 
-  'mekanik': '#f97316', 
-  'diğer': '#64748b'
-};
 
 export default function PinDetailModal({ pin, pins, setSelectedPin, projectId, isManager, onClose }) {
   const { currentUser, userData } = useAuth();
@@ -288,13 +279,13 @@ export default function PinDetailModal({ pin, pins, setSelectedPin, projectId, i
             <div>
               <div className="header-title-row">
                 <h2>Pin #{pin.number || pin.id.slice(0,4)} - {pinTitle}</h2>
-                <span className={`status-badge ${status === 'Çözüldü' ? 'resolved' : 'open'}`}>
-                  {status === 'Çözüldü' ? 'RESOLVED' : 'OPEN'}
+                <span className={`status-badge ${status === 'çözüldü' ? 'resolved' : 'open'}`}>
+                  {status === 'çözüldü' ? 'RESOLVED' : 'OPEN'}
                 </span>
               </div>
               <div className="header-meta">
                 <span><MapPin size={14} /> Zone B, Floor {pin.floorPlanIndex + 1}</span>
-                <span><UserCheck size={14} /> Assignee: {userData?.name || 'Yönetici'}</span>
+                <span><UserCheck size={14} /> Assignee: {pin.assignee || 'Atanmamış'}</span>
               </div>
             </div>
             <button className="close-btn-large" onClick={onClose}>
