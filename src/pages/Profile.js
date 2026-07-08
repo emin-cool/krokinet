@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { db, auth } from '../firebase';
-import { doc, updateDoc, deleteField } from 'firebase/firestore';
+import { doc, updateDoc, setDoc, deleteField } from 'firebase/firestore';
 import { updatePassword, signOut } from 'firebase/auth';
 import { useAuth } from '../contexts/AuthContext';
 import { ArrowLeft, User, Mail, Phone, MapPin, Award, Lock, Bell, ChevronRight, Briefcase, Clock, CheckCircle2, Shield, Folder } from 'lucide-react';
@@ -34,6 +34,8 @@ export default function Profile() {
     try {
       if (name !== userData?.name) {
         await updateDoc(doc(db, 'users', currentUser.uid), { name });
+        // Herkese açık profil de güncellensin (mobil/web tutarlılığı)
+        await setDoc(doc(db, 'publicProfiles', currentUser.uid), { name }, { merge: true }).catch(() => {});
       }
       setMessage('Profiliniz güncellendi!');
       setTimeout(() => { setShowEditModal(false); setMessage(''); }, 1500);

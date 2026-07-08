@@ -1,7 +1,7 @@
 import React from 'react';
 import moment from 'moment';
 import { AlertCircle, CalendarClock, CalendarPlus } from 'lucide-react';
-import { CATEGORY_COLORS } from '../../utils/constants';
+import { colorFor } from '../../utils/constants';
 
 export default function TaskCard({ task, onClick, onAddToCalendar }) {
   const isOverdue = task.progress < 100 && new Date(task.end) < new Date();
@@ -13,8 +13,8 @@ export default function TaskCard({ task, onClick, onAddToCalendar }) {
   else if (task.progress < 100) progressColor = '#3b82f6'; // Mavi
   else progressColor = '#22c55e'; // Yeşil
 
-  // Kategori rengi
-  const catColor = CATEGORY_COLORS[task.category?.toLowerCase()] || task.color || '#3b82f6';
+  // Kategori rengi (özel renk varsa öncelikli; yoksa ortak taksonomiden)
+  const catColor = task.color || colorFor(task.category);
 
   return (
     <div 

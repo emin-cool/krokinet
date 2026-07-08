@@ -5,7 +5,7 @@ import { db, auth } from '../firebase';
 import { doc, getDoc, collection, query, where, addDoc, serverTimestamp, onSnapshot, updateDoc, getDocs, writeBatch, deleteDoc } from 'firebase/firestore';
 import { useAuth } from '../contexts/AuthContext';
 import PinDetailModal from '../components/PinDetailModal';
-import { CATEGORY_COLORS, PIN_COLORS } from '../utils/constants';
+import { colorFor, normCat, isResolved, PIN_STATUS, CATEGORY_KEYS } from '../utils/constants';
 
 import ProjectGallery from '../components/ProjectGallery';
 import ProjectTeam from '../components/ProjectTeam';
@@ -14,7 +14,7 @@ import NotificationsDropdown from '../components/NotificationsDropdown';
 import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
 import { Building, Ruler, MessageSquare, Info, Users, MapPin, Archive, ArrowLeft, CalendarDays, Trash2, Plus, Search, Image as ImageIcon, Share2, Edit2, Calendar, AlignLeft, FileText, Download, MoreVertical, FolderPlus, Upload } from 'lucide-react';
 
-const CATEGORIES = Object.keys(CATEGORY_COLORS);
+const CATEGORIES = CATEGORY_KEYS; // Mobil ile paylaşılan tek kaynak kategori listesi
 
 const CLOUDINARY_CLOUD = 'dcx4qribb';
 const CLOUDINARY_PRESET = 'insaat-upload';
@@ -43,7 +43,7 @@ export default function ProjectDetail() {
   const [addingPin, setAddingPin] = useState(false);
   const [viewMode, setViewMode] = useState('view'); // 'view' or 'edit'
   const [selectedCategory, setSelectedCategory] = useState('All');
-  const [newPinData, setNewPinData] = useState({ title: '', category: 'genel', color: '#3b82f6' });
+  const [newPinData, setNewPinData] = useState({ title: '', category: 'GENEL', color: colorFor('GENEL') });
   const [newPinCoords, setNewPinCoords] = useState(null);
   const [loading, setLoading] = useState(true);
   const [uploadingPlan, setUploadingPlan] = useState(false);
@@ -120,14 +120,8 @@ export default function ProjectDetail() {
           if (opCount >= 450) { await batch.commit(); batch = writeBatch(db); opCount = 0; }
         }
         
-        const qFiles = query(collection(db, 'files'), where('pinId', '==', pinDoc.id));
-        const filesSnap = await getDocs(qFiles);
-        for (const f of filesSnap.docs) {
-          batch.delete(f.ref);
-          opCount++;
-          if (opCount >= 450) { await batch.commit(); batch = writeBatch(db); opCount = 0; }
-        }
-        
+        // NOT: Pin ekleri artık ayrı 'files' koleksiyonunda değil, yukarıda
+        // silinen 'messages' içinde tutuluyor (mobil ile ortak şema).
         batch.delete(pinDoc.ref);
         opCount++;
         if (opCount >= 450) { await batch.commit(); batch = writeBatch(db); opCount = 0; }
@@ -324,15 +318,15 @@ export default function ProjectDetail() {
         y: newPinCoords.y,
         projectId,
         floorPlanIndex: activeFloor,
-        status: 'açık',
-        color: CATEGORY_COLORS[newPinData.category] || '#3b82f6',
+        status: PIN_STATUS.OPEN,
+        color: colorFor(newPinData.category),
         createdBy: currentUser.uid,
         createdAt: serverTimestamp(),
         assignee: newPinData.assignee || ''
       });
 
       if (newPinData.assignee && newPinData.assignee !== userData?.name) {
-        const membersSnapshot = await getDocs(query(collection(db, 'users'), where('name', '==', newPinData.assignee)));
+        const membersSnapshot = await getDocs(query(collection(db, 'publicProfiles'), where('name', '==', newPinData.assignee)));
         if (!membersSnapshot.empty) {
           const assignedUser = membersSnapshot.docs[0];
           await addDoc(collection(db, 'notifications'), {
@@ -347,7 +341,7 @@ export default function ProjectDetail() {
       }
 
       setAddingPin(false);
-      setNewPinData({ title: '', category: 'genel', color: CATEGORY_COLORS['genel'] || '#3b82f6' });
+      setNewPinData({ title: '', category: 'GENEL', color: colorFor('GENEL') });
       setNewPinCoords(null);
     } catch (err) {
       alert('Pin kaydedilirken hata oluştu: ' + err.message);
@@ -375,13 +369,13 @@ export default function ProjectDetail() {
   const currentFloorPins = pins.filter(p => {
     if (p.isArchived) return false;
     if (p.floorPlanIndex !== activeFloor) return false;
-    if (selectedCategory !== 'All' && p.category !== selectedCategory) return false;
+    if (selectedCategory !== 'All' && normCat(p.category) !== normCat(selectedCategory)) return false;
 
-    // Filtreleme
-    if (pinFilter === 'open' && p.status !== 'açık') return false;
-    if (pinFilter === 'resolved' && p.status !== 'çözüldü') return false;
+    // Filtreleme (durum karşılaştırması eski 'açık/çözüldü' ve yeni OPEN/RESOLVED ile uyumlu)
+    if (pinFilter === 'open' && isResolved(p.status)) return false;
+    if (pinFilter === 'resolved' && !isResolved(p.status)) return false;
     if (pinFilter === 'mine' && p.assignee !== userData?.name) return false;
-    if (categoryFilter !== 'all' && p.category !== categoryFilter) return false;
+    if (categoryFilter !== 'all' && normCat(p.category) !== normCat(categoryFilter)) return false;
 
     // Arama
     if (pinSearch) {
@@ -478,7 +472,7 @@ export default function ProjectDetail() {
                   <select value={newPinData.category}
                     onChange={e => {
                       const newCat = e.target.value;
-                      setNewPinData({...newPinData, category: newCat, color: CATEGORY_COLORS[newCat]});
+                      setNewPinData({...newPinData, category: newCat, color: colorFor(newCat)});
                     }}>
                     <option value="" disabled>İş Türü Seçin</option>
                     {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
@@ -525,10 +519,10 @@ export default function ProjectDetail() {
                     <button 
                       key={c}
                       onClick={() => setSelectedCategory(c)}
-                      style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', borderRadius: '20px', border: selectedCategory === c ? `2px solid ${CATEGORY_COLORS[c]}` : '1px solid #e5e7eb', background: selectedCategory === c ? `${CATEGORY_COLORS[c]}15` : '#fff', color: '#4b5563', fontSize: '13px', fontWeight: 600, cursor: 'pointer', transition: 'all 0.2s' }}
+                      style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', borderRadius: '20px', border: selectedCategory === c ? `2px solid ${colorFor(c)}` : '1px solid #e5e7eb', background: selectedCategory === c ? `${colorFor(c)}15` : '#fff', color: '#4b5563', fontSize: '13px', fontWeight: 600, cursor: 'pointer', transition: 'all 0.2s' }}
                     >
-                      <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: CATEGORY_COLORS[c] }}></span>
-                      {c.charAt(0).toUpperCase() + c.slice(1)}
+                      <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: colorFor(c) }}></span>
+                      {c}
                     </button>
                   ))}
                 </div>
@@ -581,7 +575,7 @@ export default function ProjectDetail() {
                               style={{ 
                                 left: `${currentX}%`, 
                                 top: `${currentY}%`, 
-                                background: pin.isArchived ? '#9ca3af' : (pin.color || CATEGORY_COLORS[pin.category] || PIN_COLORS[pin.status] || '#F59E0B'),
+                                background: pin.isArchived ? '#9ca3af' : (pin.color || colorFor(pin.category)),
                                 opacity: pin.isArchived ? 0.7 : 1,
                                 filter: pin.isArchived ? 'grayscale(100%)' : 'none',
                                 cursor: movingPinId === pin.id ? (isDragging ? 'grabbing' : 'grab') : 'pointer',

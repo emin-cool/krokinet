@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { auth, db } from '../firebase';
 import { onAuthStateChanged } from 'firebase/auth';
-import { doc, onSnapshot } from 'firebase/firestore';
+import { doc, onSnapshot, setDoc } from 'firebase/firestore';
 
 const AuthContext = createContext();
 
@@ -19,6 +19,7 @@ export function AuthProvider({ children }) {
     let unsubUser = null;
 
     const unsubscribe = onAuthStateChanged(auth, (user) => {
+      let profileSynced = false; // oturum başına bir kez publicProfile senkronizasyonu
       setCurrentUser(user);
 
       if (unsubUser) { unsubUser(); unsubUser = null; }
@@ -26,12 +27,21 @@ export function AuthProvider({ children }) {
       if (user) {
         setUserDataLoading(true);
         unsubUser = onSnapshot(doc(db, 'users', user.uid), (snap) => {
-          if (snap.exists()) {
-            setUserData(snap.data());
-          } else {
-            setUserData(null);
-          }
+          const data = snap.exists() ? snap.data() : null;
+          setUserData(data);
           setUserDataLoading(false);
+          // publicProfiles migration/backfill: mobil ile aynı — oturum başına bir kez.
+          // Mobil AuthContext ile birebir alanlar (isim/mahlas/rol her yerde görünebilsin).
+          if (data && !profileSynced) {
+            profileSynced = true;
+            setDoc(doc(db, 'publicProfiles', user.uid), {
+              name:       data.name       || '',
+              profilePic: data.profilePic || '',
+              mahlas:     data.mahlas     || '',
+              role:       data.role       || '',
+              username:   data.username   || '',
+            }, { merge: true }).catch(() => {});
+          }
         });
       } else {
         setUserData(null);

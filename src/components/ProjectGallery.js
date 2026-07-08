@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../firebase';
 import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
+import { msgUrl } from '../utils/media';
 
 export default function ProjectGallery({ projectId, pinId }) {
   const [mediaFiles, setMediaFiles] = useState([]);
@@ -23,7 +24,8 @@ export default function ProjectGallery({ projectId, pinId }) {
         let files = [];
         snapshot.forEach(doc => {
           const data = doc.data();
-          if (data.fileUrl) {
+          // Eski web (`fileUrl`) ve yeni/mobil (`url`) ekleri birlikte
+          if (msgUrl(data)) {
             files.push({
               id: doc.id,
               ...data
@@ -66,9 +68,9 @@ export default function ProjectGallery({ projectId, pinId }) {
               display: 'flex',
               flexDirection: 'column'
             }}>
-              <a href={file.fileUrl} target="_blank" rel="noreferrer" style={{ display: 'block', flex: 1, backgroundColor: '#000' }}>
-                <img 
-                  src={file.fileUrl} 
+              <a href={msgUrl(file)} target="_blank" rel="noreferrer" style={{ display: 'block', flex: 1, backgroundColor: '#000' }}>
+                <img
+                  src={msgUrl(file)}
                   alt="Medya" 
                   style={{ width: '100%', height: '180px', objectFit: 'cover', display: 'block' }} 
                   onError={(e) => { e.target.src = 'https://via.placeholder.com/200?text=Dosya'; }}

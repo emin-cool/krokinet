@@ -1,60 +1,300 @@
 rules_version = '2';
+
+// Şanti — Firestore güvenlik kuralları.
+// Deploy: firebase deploy --only firestore:rules
+//
+// NOT: Kullanıcı dokümanları, ekip isimlerinin/mahlasların her yerde
+// gösterilebilmesi için giriş yapmış herkese OKUMA açıktır. E-posta/push token
+// gibi alanlar hassassa, bunları ayrı bir alt-dokümana taşımanız önerilir.
+
 service cloud.firestore {
   match /databases/{database}/documents {
+
     function isSignedIn() {
       return request.auth != null;
     }
-
+    function userDoc() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+    // NOT: /users/{uid} dokümanı yoksa (silinmiş hesap, henüz oluşmamış vb.)
+    // userDoc() çağrısı rule içinde hata fırlatır → istemeden "permission-denied"
+    // ile sonuçlanır. exists() koruması bunu güvenli biçimde false'a çevirir.
+    function hasUserDoc() {
+      return exists(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+    // NOT: Tüm alan okumaları .get(key, default) ile yapılır — eksik alana
+    // doğrudan nokta erişimi (`.isSuperAdmin`) genelde null döner ama bazı
+    // ifadelerde (örn. `x in <eksik-alan>`) tip uyuşmazlığı hatası fırlatabilir.
+    // .get() her zaman güvenli bir varsayılan değer garantiler.
     function isSuperAdmin() {
-      return isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isSuperAdmin == true;
+      return isSignedIn() && hasUserDoc() && userDoc().get('isSuperAdmin', false) == true;
+    }
+    // İşlemi yapan kişinin kendisi yönetici mi? (yeni hesap oluştururken yetki kontrolü)
+    function isManagerSelf() {
+      return isSignedIn() &&
+        hasUserDoc() &&
+        (userDoc().get('isSuperAdmin', false) == true || userDoc().get('role', '') == 'manager');
+    }
+    // Pasifleştirilmiş hesaplar yazamaz (süper admin hariç)
+    function notSuspended() {
+      return isSignedIn() && hasUserDoc() && (isSuperAdmin() || userDoc().get('status', '') != 'suspended');
+    }
+    function projectData(pid) {
+      return get(/databases/$(database)/documents/projects/$(pid)).data;
+    }
+    function isMember(pid) {
+      return isSignedIn() && exists(/databases/$(database)/documents/projects/$(pid)) &&
+        request.auth.uid in projectData(pid).get('memberIds', []);
+    }
+    function isProjectManager(pid) {
+      return isSignedIn() && exists(/databases/$(database)/documents/projects/$(pid)) && (
+        projectData(pid).get('managerId', '') == request.auth.uid ||
+        projectData(pid).get('memberRoles', {}).get(request.auth.uid, '') == 'manager'
+      );
+    }
+    // Mesaj okuma yetkisini mesajın KENDİ projectId'sine göre değil, bağlı olduğu
+    // pin üzerinden doğrular. Sorgu tek bir pinId ile sınırlı olduğundan, dönen
+    // tüm mesajlar aynı (erişilebilir) pin'e aittir → liste "hep-ya-hiç" kuralı
+    // bir mesajda projectId eksik olsa bile çökmez.
+    function isPinMember(pinId) {
+      return isSignedIn() &&
+        exists(/databases/$(database)/documents/pins/$(pinId)) &&
+        isMember(get(/databases/$(database)/documents/pins/$(pinId)).data.projectId);
     }
 
-    match /users/{userId} {
-      allow read: if isSignedIn();
-      allow create: if isSignedIn() && !request.resource.data.isSuperAdmin;
-      allow update: if isSignedIn() &&
-        (request.auth.uid == userId || isSuperAdmin()) &&
-        (request.auth.uid != userId || !request.resource.data.diff(resource.data).affectedKeys().hasAny(['isSuperAdmin']));
-      allow delete: if isSuperAdmin();
+    // ── Herkese açık profiller (yalnızca görüntüleme alanları) ──
+    // name, profilePic, mahlas, role, username saklar.
+    // GÜVENLİK NOTU (expoPushToken): Bu doküman giriş yapan HERKESE okuma açık.
+    // expoPushToken'ı burada TUTMAYIN — saklanırsa her kullanıcı tüm tokenları
+    // toplayıp Expo Push API üzerinden uygulamayı by-pass ederek oltalama
+    // bildirimi gönderebilir. Token yalnızca /users/{uid} (yalnız sahip+superAdmin)
+    // içinde tutulmalı; push gönderimi sunucu/Cloud Function tarafında yapılmalı.
+    // Firestore kuralları alan-bazlı OKUMA kısıtı yapamaz; bu yüzden çözüm token'ı
+    // bu koleksiyondan çıkarmaktır (istemci kodu değişikliği gerektirir).
+    match /publicProfiles/{uid} {
+      allow read:   if isSignedIn();
+      // Oluşturma: kullanıcı kendi profilini; yönetici/superAdmin yeni çalışan
+      // profilini oluşturur. create yalnızca doküman YOKKEN geçer → mevcut bir
+      // profilin üzerine yazılarak kimlik taklidi yapılması engellenir.
+      allow create: if isSignedIn() && (request.auth.uid == uid || isManagerSelf() || isSuperAdmin());
+      // Güncelleme/silme: sahip ya da superAdmin. Yönetici yalnızca sıradan
+      // çalışanın profilini değiştirebilir; başka bir yöneticinin/superAdmin'in
+      // public profilini EZEMEZ (impersonation engeli).
+      // KALAN RİSK: manager↔çalışan ilişki alanı (örn. companyId/managerId)
+      // olmadığı için bir yönetici farklı firmanın sıradan çalışanının profilini
+      // de güncelleyebilir. Tam kapsama için profile bir companyId ekleyip burada
+      // doğrulayın.
+      allow update, delete: if isSignedIn() && (
+        request.auth.uid == uid ||
+        isSuperAdmin() ||
+        (isManagerSelf() &&
+         resource.data.get('role', '') != 'manager' &&
+         resource.data.get('isSuperAdmin', false) != true)
+      );
     }
 
-    match /groups/{groupId} {
-      allow read: if isSignedIn();
-      allow write: if isSignedIn();
+    // ── Kullanıcılar ──
+    match /users/{uid} {
+      // Hassas alanlar (email, telefon, planTier, paymentStatus, expoPushToken vb.)
+      // burada saklanır. Sadece SAHİBİ ve superAdmin okuyabilir.
+      allow read:   if request.auth.uid == uid || isSuperAdmin();
+      // Hesap açılışı (ikincil app ile yönetici/çalışan oluşturma + ilk doküman).
+      // YETKİ YÜKSELTME ENGELİ:
+      //  - isSuperAdmin:true SADECE mevcut bir süper admin tarafından yazılabilir.
+      //  - role:'manager' SADECE bir yönetici/süper admin tarafından yazılabilir.
+      // Aksi halde herhangi bir kullanıcı yeni bir auth hesabı açıp kendi
+      // dokümanını süper admin/yönetici olarak oluşturup yetki yükseltebilirdi.
+      // - Doküman yalnızca KENDİ uid'in için ya da bir yönetici/superAdmin
+      //   tarafından oluşturulabilir → başkasının uid'ini "squat" etme engeli.
+      // - planTier / paymentStatus istemciden ayarlanamaz; abonelik alanları
+      //   yalnızca superAdmin veya sunucu (Cloud Function) tarafından yazılmalı
+      //   → ilk oluşturmada bedava plan yükseltme (escalation) engeli.
+      allow create: if isSignedIn() && (
+        isSuperAdmin() ||
+        ((request.auth.uid == uid || isManagerSelf()) &&
+         request.resource.data.get('isSuperAdmin', false) != true &&
+         (request.resource.data.get('role', '') != 'manager' || isManagerSelf()) &&
+         !('planTier' in request.resource.data) &&
+         !('paymentStatus' in request.resource.data))
+      );
+      allow update: if isSignedIn() && (
+        isSuperAdmin() ||
+        // Kullanıcı KENDİ dokümanında yalnızca güvenli (yetkisiz) alanları değiştirebilir.
+        // isSuperAdmin / role / status / planTier / paymentStatus gibi yetki ve
+        // abonelik alanları ASLA istemciden yazılamaz → yetki yükseltme engellenir.
+        (request.auth.uid == uid &&
+         request.resource.data.diff(resource.data).affectedKeys()
+           .hasOnly(['name', 'profilePic', 'expoPushToken', 'mustChangePassword', 'tempPassword'])) ||
+        // Yöneticiler, sıradan çalışanın yalnızca status alanını güncelleyebilir
+        // (projeden çıkarınca suspend etmek için kullanılır).
+        // GÜVENLİK: Bu dal MUTLAKA isManagerSelf() ister + kişinin kendini
+        // güncellemesini (request.auth.uid != uid) engeller. Aksi halde:
+        //  (a) herhangi bir çalışan başka bir çalışanı suspend ederek DoS yapar,
+        //  (b) suspend edilmiş bir çalışan kendi status'ünü 'active' yapıp
+        //      askıya almayı tamamen by-pass ederdi.
+        (isManagerSelf() &&
+         request.auth.uid != uid &&
+         resource.data.get('isSuperAdmin', false) != true &&
+         resource.data.get('role', '') != 'manager' &&
+         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status']))
+      );
+      // Yöneticiler, ekipten çıkardıkları sıradan çalışanın hesabını TAMAMEN
+      // silebilir (bkz. ProjectTeamTab.js removeUser — başka projesi kalmadıysa
+      // artık askıya almak yerine siliyor). Hedefin süper admin/yönetici
+      // OLMAMASI şartı, bir yöneticinin başka bir yöneticiyi/süper admini
+      // silmesini engeller.
+      // Herkes KENDİ hesabını silebilir (mağaza zorunluluğu — App Store 5.1.1(v)
+      // / Play Store hesap silme kuralı, bkz. ProfileScreen.js "Hesabımı Sil").
+      allow delete: if isSuperAdmin() ||
+                       request.auth.uid == uid ||
+                       (isManagerSelf() &&
+                        resource.data.get('isSuperAdmin', false) != true &&
+                        resource.data.get('role', '') != 'manager');
     }
 
-    match /projects/{projectId} {
-      allow read: if isSignedIn();
-      allow create: if isSignedIn();
-      allow update: if isSignedIn() && (request.auth.uid in resource.data.memberIds || isSuperAdmin());
-      allow delete: if isSignedIn() && (resource.data.managerId == request.auth.uid || isSuperAdmin());
+    // ── Projeler ──
+    match /projects/{pid} {
+      // Üçüncü dal: yönetici, ekipten çıkardığı çalışanın BAŞKA bir projesinde
+      // (kendi projeleri arasında) hâlâ üye olup olmadığını kontrol ederken
+      // `where('managerId','==',uid)` ile sorgular (bkz. ProjectTeamTab.js
+      // removeUser) — bu dal olmadan, sorgu memberIds'e bakan ilk dalla
+      // eşleşmediğinden (aranan kişi request.auth.uid değil) Firestore TÜM
+      // sorguyu permission-denied ile reddediyordu.
+      allow read:   if isSuperAdmin() ||
+                       (isSignedIn() && request.auth.uid in resource.data.memberIds) ||
+                       (isSignedIn() && resource.data.managerId == request.auth.uid);
+      allow create: if notSuspended() && request.resource.data.managerId == request.auth.uid;
+      allow update: if isSuperAdmin() ||
+                       (notSuspended() && isProjectManager(pid)) ||
+                       // Üyeler yalnızca görev ilerlemesi ve dosya alanlarını güncelleyebilir
+                       (notSuspended() && request.auth.uid in resource.data.memberIds &&
+                        request.resource.data.diff(resource.data).affectedKeys()
+                          .hasOnly(['schedule', 'projectFiles', 'folders']));
+      allow delete: if isSuperAdmin() || isProjectManager(pid);
     }
 
-    match /pins/{pinId} {
-      allow read: if isSignedIn();
-      allow create: if isSignedIn();
-      allow update, delete: if isSignedIn() &&
-        (request.auth.uid in get(/databases/$(database)/documents/projects/$(resource.data.projectId)).data.memberIds || isSuperAdmin());
+    // ── Pin'ler ──
+    match /pins/{id} {
+      allow read:   if isSuperAdmin() || isMember(resource.data.projectId);
+      // Oluştururken kendi uid'ini createdBy olarak yazmalı (başkası adına pin açılamaz)
+      allow create: if notSuspended() &&
+                       isMember(request.resource.data.projectId) &&
+                       request.resource.data.createdBy == request.auth.uid;
+      // Güncelleme: projenin üyesi (durum, açıklama, ek, sabitlenen mesaj vb.)
+      // createdBy ve projectId DEĞİŞTİRİLEMEZ → bir üyenin pini başka projeye
+      // taşıması ya da "oluşturan" kaydını değiştirip silme yetkisini/iftirayı
+      // manipüle etmesi engellenir.
+      allow update: if isSuperAdmin() ||
+                       (notSuspended() && isMember(resource.data.projectId) &&
+                        request.resource.data.createdBy == resource.data.createdBy &&
+                        request.resource.data.projectId == resource.data.projectId);
+      // Silme: yalnızca yönetici VEYA pini oluşturan kişi.
+      // (Önceden her üye herhangi bir pini + tüm mesajlarını silebiliyordu.)
+      allow delete: if isSuperAdmin() ||
+                       (notSuspended() && (
+                         isProjectManager(resource.data.projectId) ||
+                         resource.data.createdBy == request.auth.uid
+                       ));
     }
 
-    match /messages/{messageId} {
-      allow read: if isSignedIn();
-      allow create: if isSignedIn();
-      allow update, delete: if isSignedIn() &&
-        (request.auth.uid in get(/databases/$(database)/documents/projects/$(resource.data.projectId)).data.memberIds || isSuperAdmin());
+    // ── Mesajlar ──
+    match /messages/{id} {
+      // Üçüncü dal: proje silinirken cascade temizlik için projectId'ye göre
+      // toplu sorgu (bkz. projectCleanup.js). Firestore, liste sorgularında
+      // kuralın sorgunun TÜM olası sonuçları için doğrulanabilmesini ister;
+      // isPinMember(pinId) sorgunun filtre alanı (projectId) ile eşleşmediğinden
+      // bu dal olmadan projectId'ye göre sorgu HER ZAMAN permission-denied verir
+      // (proje boş/aktivitesiz olsa bile) — "Projeyi Sil" bu yüzden çöküyordu.
+      allow read:   if isSuperAdmin() || isPinMember(resource.data.pinId) ||
+                       (resource.data.get('projectId', '') != '' &&
+                        isProjectManager(resource.data.get('projectId', '')));
+      allow create: if notSuspended() &&
+                       isMember(request.resource.data.projectId) &&
+                       request.resource.data.userId == request.auth.uid;
+      // Güncelleme: yazar veya proje yöneticisi; ancak userId/projectId
+      // DEĞİŞTİRİLEMEZ → mesajın yazarını/projesini değiştirip iftira/veri taşıma
+      // engellenir. (Silme için bu kısıt gerekmez, ayrı tutulur.)
+      allow update: if isSuperAdmin() ||
+                       (((isSignedIn() && resource.data.userId == request.auth.uid) ||
+                         isProjectManager(resource.data.get('projectId', ''))) &&
+                        request.resource.data.userId == resource.data.userId &&
+                        request.resource.data.get('projectId', '') == resource.data.get('projectId', ''));
+      allow delete: if isSuperAdmin() ||
+                       (isSignedIn() && resource.data.userId == request.auth.uid) ||
+                       isProjectManager(resource.data.get('projectId', ''));
     }
 
-    match /files/{fileId} {
-      allow read: if isSignedIn();
-      allow create: if isSignedIn();
-      allow update, delete: if isSignedIn() &&
-        (request.auth.uid in get(/databases/$(database)/documents/projects/$(resource.data.projectId)).data.memberIds || isSuperAdmin());
+    // ── Bildirimler ──
+    match /notifications/{id} {
+      // Üçüncü dal: proje silinirken cascade temizlik için projectId'ye göre
+      // toplu sorgu (bkz. projectCleanup.js) — aşağıdaki `delete` kuralı zaten
+      // projenin yöneticisine izin veriyordu, ama `read` kuralı güncellenmemişti.
+      // Liste sorgusu (getDocs) önce READ izni gerektirdiğinden, bu eksiklik
+      // "Projeyi Sil" işlemini HER projede permission-denied ile çökertiyordu.
+      allow read:   if isSignedIn() && (
+                       resource.data.userId == request.auth.uid ||
+                       isSuperAdmin() ||
+                       (resource.data.get('projectId', '') != '' &&
+                        isProjectManager(resource.data.get('projectId', '')))
+                     );
+      // Yalnızca ilgili projenin üyesi, o proje için bildirim oluşturabilir.
+      // Aksi halde herkes sahte "X sizi etiketledi" bildirimi gönderebilirdi (spam/phishing).
+      // ALICI da (userId) aynı projenin üyesi olmalı → projeyle ilgisiz rastgele
+      // kullanıcılara hedefli oltalama bildirimi gönderilmesi engellenir.
+      allow create: if isSuperAdmin() ||
+                       (isSignedIn() && isMember(request.resource.data.projectId) &&
+                        request.resource.data.userId in
+                          projectData(request.resource.data.projectId).get('memberIds', []));
+      allow update: if isSignedIn() && resource.data.userId == request.auth.uid;
+      // Sahibi VEYA projenin yöneticisi silebilir (proje silinirken cascade temizlik için).
+      allow delete: if isSuperAdmin() ||
+                       (isSignedIn() && resource.data.userId == request.auth.uid) ||
+                       (isSignedIn() && isProjectManager(resource.data.projectId));
     }
 
-    match /notifications/{notificationId} {
-      allow read: if isSignedIn() && resource.data.userId == request.auth.uid;
-      allow create: if isSignedIn();
-      allow update, delete: if isSignedIn() && resource.data.userId == request.auth.uid;
+    // ── Çalışma planları ──
+    match /workSchedules/{id} {
+      // Yalnızca planın üyelerinden biri (çalışan: memberIds array-contains sorgusu)
+      // VEYA projenin güncel üyesi (yönetici: projectId sorgusu) okuyabilir.
+      // Önceden `isSignedIn()` idi → her firmanın çalışanı tüm firmaların planlarını okuyabiliyordu.
+      // .get(...,[]) ile güvenli erişim: memberIds eksik bir dokümanda doğrudan
+      // `in` kullanımı kural-içi hata fırlatıp tüm okumayı permission-denied
+      // yapardı (güvenilirlik).
+      allow read:   if isSignedIn() && (
+                       request.auth.uid in resource.data.get('memberIds', []) ||
+                       isMember(resource.data.get('projectId', ''))
+                     );
+      // Sadece proje üyesi oluşturabilir; kendi uid'ini workerId olarak kaydetmeli
+      // (süper admin de test/destek amaçlı oluşturabilir)
+      allow create: if isSuperAdmin() ||
+                       (notSuspended() &&
+                        request.resource.data.workerId == request.auth.uid &&
+                        isMember(request.resource.data.projectId));
+      // Sahibi güncelleyebilir/silebilir; süper admin de güncelleyebilir/silebilir
+      allow update: if isSuperAdmin() || (isSignedIn() && resource.data.workerId == request.auth.uid);
+      // Silme ayrıca: projenin yöneticisi de silebilir (proje silinirken cascade temizlik için)
+      allow delete: if isSuperAdmin() ||
+                       (isSignedIn() && resource.data.workerId == request.auth.uid) ||
+                       (isSignedIn() && isProjectManager(resource.data.projectId));
+    }
+
+    // ── Takvim etkinlikleri (YALNIZCA WEB) ──
+    // Web GlobalCalendar'ın paylaşımlı takvimi. Dokümanlarda sahiplik alanı YOK;
+    // mevcut (canlı) davranışı korumak için giriş yapan herkes okuyup yazabilir.
+    // Mobil bu koleksiyonu kullanmaz. Sahip-bazlı kısıtlama istenirse önce istemci
+    // her dokümana userId yazmalı, sonra bu kural sıkılaştırılmalıdır.
+    match /calendar_events/{id} {
+      allow read, write: if isSignedIn();
+    }
+
+    // ── Kişisel takvim (YALNIZCA WEB) ──
+    // Proje görevlerinin kullanıcıya özel kopyaları; her doküman userId taşır.
+    // Yalnızca sahibi okur/yazar. (ProjectSchedule.js'teki çapraz-kullanıcı senkron
+    // best-effort'tur; sahibi olmayan kopyalara yazamamak çekirdek akışı bozmaz.)
+    match /personal_calendar_events/{id} {
+      allow read:            if isSignedIn() && resource.data.get('userId', '') == request.auth.uid;
+      allow create:          if isSignedIn() && request.resource.data.get('userId', '') == request.auth.uid;
+      allow update, delete:  if isSignedIn() && resource.data.get('userId', '') == request.auth.uid;
     }
   }
 }

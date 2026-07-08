@@ -1,253 +1,355 @@
-/* eslint-disable no-unused-vars, react-hooks/exhaustive-deps */
-import React, { useState, useEffect } from 'react';
+/* eslint-disable react-hooks/exhaustive-deps */
+// Proje ekip sekmesi — MOBİL `ProjectTeamTab.js` + `AddWorkerModal.js` ile aynı
+// veri modeli. Üyelik proje dokümanındaki memberIds / memberRoles / memberMeta
+// üzerinden tutulur; eski global `groups` koleksiyonu ARTIK KULLANILMAZ.
+import React, { useState, useEffect, useMemo } from 'react';
 import { db } from '../firebase';
-import { collection, getDocs, addDoc, doc, setDoc, serverTimestamp, updateDoc, arrayUnion, arrayRemove, getDoc, onSnapshot, query, limit, deleteField, deleteDoc } from 'firebase/firestore';
-import { generateStrongPassword } from '../utils/constants';
-import { firebaseConfig } from '../firebase';
-import { initializeApp, getApps } from 'firebase/app';
-import { getAuth, createUserWithEmailAndPassword } from 'firebase/auth';
+import {
+  collection, query, where, doc, onSnapshot, updateDoc, deleteDoc,
+  arrayRemove, deleteField, getDocs, documentId,
+} from 'firebase/firestore';
+import { useAuth } from '../contexts/AuthContext';
+import { createWorkerAccount, updateWorkerMeta, slugifyName, EMAIL_DOMAIN } from '../utils/teamAuth';
+import { CATEGORIES, colorFor } from '../utils/constants';
+import { UserMinus, UserPlus, Pencil, X, Check, Copy, Shield, HardHat } from 'lucide-react';
 
-const secondaryApp = getApps().find(a => a.name === 'Secondary') || initializeApp(firebaseConfig, 'Secondary');
-const secondaryAuth = getAuth(secondaryApp);
+const TITLE_PRESETS = [
+  'Şantiye Şefi', 'Saha Mühendisi', 'Mimar', 'İnşaat Müh.',
+  'Elektrik Müh.', 'Makine Müh.', 'Formen', 'Usta', 'Kalfa',
+  'İşçi', 'Tekniker', 'Taşeron',
+];
 
 export default function ProjectTeam({ projectId, isManager }) {
-  const [groups, setGroups] = useState([]);
-  const [allUsers, setAllUsers] = useState([]);
-  const [projectMembers, setProjectMembers] = useState([]);
+  const { currentUser } = useAuth();
   const [project, setProject] = useState(null);
-  const [newGroupName, setNewGroupName] = useState('');
-  const [newUser, setNewUser] = useState({ name: '', username: '', password: '', groupId: '', customTitle: '' });
-  const [selectedRole, setSelectedRole] = useState('worker');
-  const [loading, setLoading] = useState(false);
-  const [activeSection, setActiveSection] = useState('members');
+  const [members, setMembers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [showModal, setShowModal] = useState(false);
+  const [editMember, setEditMember] = useState(null);
 
-  useEffect(() => { 
-    const qGroups = query(collection(db, 'groups'), limit(100));
-    const unsubGroups = onSnapshot(qGroups, snap => {
-      setGroups(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+  // Proje dokümanına canlı abonelik
+  useEffect(() => {
+    const unsub = onSnapshot(doc(db, 'projects', projectId), snap => {
+      if (snap.exists()) setProject({ id: snap.id, ...snap.data() });
     });
-
-    const qUsers = query(collection(db, 'users'), limit(500));
-    const unsubUsers = onSnapshot(qUsers, snap => {
-      setAllUsers(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-    });
-
-    const unsubProject = onSnapshot(doc(db, 'projects', projectId), snap => {
-      if (snap.exists()) {
-        const projectData = { id: snap.id, ...snap.data() };
-        setProject(projectData);
-      }
-    });
-
-    return () => {
-      unsubGroups();
-      unsubUsers();
-      unsubProject();
-    };
+    return unsub;
   }, [projectId]);
 
-  useEffect(() => {
-    if (project && allUsers.length > 0) {
-      const memberIds = project.memberIds || [];
-      setProjectMembers(allUsers.filter(u => memberIds.includes(u.id)));
-    }
-  }, [project, allUsers]);
-
-  async function createGroup() {
-    if (!newGroupName.trim()) return;
-    await addDoc(collection(db, 'groups'), { name: newGroupName.trim(), createdAt: serverTimestamp() });
-    setNewGroupName('');
-  }
-
-  async function createUserAndAdd() {
-    if (!newUser.name) {
-      alert('Ad Soyad alanı zorunludur'); return;
-    }
-    setLoading(true);
-    
-    // Auto-generate username & password
-    const safeName = newUser.name.toLowerCase().replace(/[^a-z0-9]/g, '');
-    const autoUsername = safeName + Math.floor(Math.random() * 1000);
-    const autoPassword = generateStrongPassword();
+  // Üyeleri publicProfiles'tan getir (users yalnız sahibi tarafından okunabilir)
+  const fetchMembers = async () => {
+    const ids = project?.memberIds || [];
+    if (ids.length === 0) { setMembers([]); setLoading(false); return; }
     try {
-      const selectedGroup = groups.find(g => g.id === newUser.groupId);
-      const finalTitle = newUser.customTitle.trim() || selectedGroup?.name || '';
-      const email = `${autoUsername}@insaat-app.com`;
-      const userCred = await createUserWithEmailAndPassword(secondaryAuth, email, autoPassword);
-      const uid = userCred.user.uid;
-      await setDoc(doc(db, 'users', uid), {
-        name: newUser.name,
-        username: autoUsername,
-        email,
-        role: finalTitle,
-        groupId: newUser.groupId,
-        isSuperAdmin: false
-      });
+      const chunks = [];
+      for (let i = 0; i < ids.length; i += 10) chunks.push(ids.slice(i, i + 10));
+      const snaps = await Promise.all(
+        chunks.map(chunk =>
+          getDocs(query(collection(db, 'publicProfiles'), where(documentId(), 'in', chunk)))
+        )
+      );
+      setMembers(snaps.flatMap(s => s.docs.map(d => ({ id: d.id, ...d.data() }))));
+    } catch (err) {
+      console.error('Ekip üyeleri getirilemedi:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+  useEffect(() => { fetchMembers(); }, [JSON.stringify(project?.memberIds), JSON.stringify(project?.memberMeta)]);
+
+  const managers = members.filter(m => project?.memberRoles?.[m.id] === 'manager' || project?.managerId === m.id);
+  const workers  = members.filter(m => project?.memberRoles?.[m.id] !== 'manager' && project?.managerId !== m.id);
+
+  const removeUser = async (userId, role) => {
+    if (!isManager) return;
+    if (!window.confirm('Bu kişiyi projeden çıkarmak istediğinize emin misiniz?')) return;
+    try {
       await updateDoc(doc(db, 'projects', projectId), {
-        memberIds: arrayUnion(uid),
-        [`memberRoles.${uid}`]: selectedRole
+        memberIds: arrayRemove(userId),
+        [`memberRoles.${userId}`]: deleteField(),
+        [`memberMeta.${userId}`]: deleteField(),
       });
-      await secondaryAuth.signOut();
-      setNewUser({ name: '', username: '', password: '', groupId: '', customTitle: '' });
-      setSelectedRole('worker');
-      alert(`Kullanıcı başarıyla oluşturuldu!\n\nKullanıcı Adı: ${autoUsername}\nGeçici Şifre: ${autoPassword}\n\nLütfen bu bilgileri kullanıcıyla paylaşın. Kullanıcı profilinden şifresini değiştirebilir.`);
-    } catch (err) { alert('Hata: ' + err.message); }
-    setLoading(false);
-  }
-
-  async function addExistingUser(userId) {
-    await updateDoc(doc(db, 'projects', projectId), {
-      memberIds: arrayUnion(userId),
-      [`memberRoles.${userId}`]: selectedRole
-    });
-  }
-
-  async function removeUser(userId) {
-    if (!window.confirm('Bu kullanıcıyı projeden çıkarmak istediğinize emin misiniz?')) return;
-    const projectRef = doc(db, 'projects', projectId);
-    await updateDoc(projectRef, { 
-      memberIds: arrayRemove(userId),
-      [`memberRoles.${userId}`]: deleteField()
-    });
-    try {
-      await deleteDoc(doc(db, 'users', userId));
     } catch (e) {
-      console.error('Kullanıcı dökümanı silinemedi:', e);
+      console.error('Üye çıkarılamadı:', e);
+      alert('Üye çıkarılırken bir sorun oluştu.');
+      return;
     }
-  }
+    // Yönetici hesapları silinmez; çalışanlar başka projede kalmadıysa tamamen silinir.
+    if (role === 'manager') { fetchMembers(); return; }
+    try {
+      const remaining = await getDocs(query(
+        collection(db, 'projects'),
+        where('managerId', '==', currentUser.uid),
+        where('memberIds', 'array-contains', userId),
+      ));
+      if (remaining.empty) {
+        await deleteDoc(doc(db, 'users', userId)).catch(() => {});
+        await deleteDoc(doc(db, 'publicProfiles', userId)).catch(() => {});
+      }
+    } catch (e) {
+      console.error('Çıkarılan çalışan silinemedi (proje üyeliği zaten kaldırıldı):', e);
+    }
+    fetchMembers();
+  };
 
-  const nonMembers = allUsers.filter(u => !u.isSuperAdmin && !(project?.memberIds || []).includes(u.id));
+  const openEdit = (m, role) => {
+    if (!isManager) return;
+    setEditMember({ ...m, role, meta: project?.memberMeta?.[m.id] || {} });
+    setShowModal(true);
+  };
+  const openCreate = () => { setEditMember(null); setShowModal(true); };
 
-  const managers = projectMembers.filter(m => project?.memberRoles?.[m.id] === 'manager' || project?.managerId === m.id);
-  const workers = projectMembers.filter(m => project?.memberRoles?.[m.id] !== 'manager' && project?.managerId !== m.id);
+  if (loading) return <div className="loading" style={{ padding: 24 }}>Yükleniyor...</div>;
 
-  const RoleSelector = () => (
-    <div className="permissions-box" style={{ marginBottom: 16 }}>
-      <p style={{fontSize: 13, fontWeight: 600, color: '#94a3b8', marginBottom: 8}}>Proje Yetkisi (Rol):</p>
-      <select value={selectedRole} onChange={e => setSelectedRole(e.target.value)} style={{ padding: '8px 12px', borderRadius: 6, border: '1px solid var(--border-color)', width: '100%', fontSize: 14, background: 'var(--bg-card)', color: 'var(--text-main)' }}>
-        <option value="worker">Çalışan (Sadece sohbet eder ve görüntüler)</option>
-        <option value="manager">Yönetici (Pin ekler/siler, ekibi yönetir)</option>
-      </select>
-    </div>
-  );
-
-  return (
-    <div className="team-view">
-      <div className="floor-tabs" style={{ padding: '16px 24px 0' }}>
-        <button className={activeSection === 'members' ? 'floor-tab active' : 'floor-tab'} onClick={() => setActiveSection('members')}>👥 Üyeler</button>
-        {isManager && <button className={activeSection === 'add' ? 'floor-tab active' : 'floor-tab'} onClick={() => setActiveSection('add')}>➕ Üye Ekle</button>}
-        {isManager && <button className={activeSection === 'groups' ? 'floor-tab active' : 'floor-tab'} onClick={() => setActiveSection('groups')}>🏷️ Gruplar</button>}
-      </div>
-
-      <div style={{ padding: '16px 24px' }}>
-        {activeSection === 'members' && (
-          <div className="members-list">
-            {projectMembers.length === 0 ? (
-              <p className="empty-state">Henüz üye yok.</p>
-            ) : (
-              <>
-                {managers.length > 0 && (
-                  <div style={{ marginBottom: 24 }}>
-                    <h4 style={{ color: 'var(--primary-color)', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6 }}>👑 Yöneticiler</h4>
-                    {managers.map(member => (
-                      <div key={member.id} className="member-item">
-                        <div className="member-avatar">{member.name?.charAt(0)?.toUpperCase()}</div>
-                        <div className="member-info">
-                          <span className="member-name">{member.name}</span>
-                          <span className="member-role">{member.role || 'Yönetici'}</span>
-                        </div>
-                        {isManager && project?.managerId !== member.id && <button className="btn-danger" onClick={() => removeUser(member.id)}>Çıkar</button>}
-                      </div>
-                    ))}
-                  </div>
-                )}
-                {workers.length > 0 && (
-                  <div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                      <h4 style={{ color: 'var(--primary-color)', display: 'flex', alignItems: 'center', gap: 6 }}>👷 Çalışanlar</h4>
-                    </div>
-
-                    {isManager && (
-                      <div style={{ overflowX: 'auto', marginBottom: 24, background: 'var(--bg-card)', borderRadius: 8, border: '1px solid var(--border-color)' }}>
-                        <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: 13 }}>
-                          <thead>
-                            <tr style={{ borderBottom: '1px solid var(--border-color)', background: 'rgba(59, 130, 246, 0.1)' }}>
-                              <th style={{ padding: '10px 16px', color: '#94a3b8', fontWeight: 600 }}>Ad Soyad</th>
-                              <th style={{ padding: '10px 16px', color: '#94a3b8', fontWeight: 600 }}>Ünvan</th>
-                              <th style={{ padding: '10px 16px', color: '#94a3b8', fontWeight: 600 }}>Kullanıcı Adı</th>
-                              <th style={{ padding: '10px 16px', color: '#94a3b8', fontWeight: 600 }}>Durum</th>
-                              <th style={{ padding: '10px 16px', color: '#94a3b8', fontWeight: 600, textAlign: 'right' }}>İşlem</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {workers.map(member => (
-                              <tr key={member.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
-                                <td style={{ padding: '10px 16px' }}>{member.name}</td>
-                                <td style={{ padding: '10px 16px', color: '#94a3b8' }}>{member.role || 'Çalışan'}</td>
-                                <td style={{ padding: '10px 16px', fontFamily: 'monospace', color: '#3b82f6' }}>{member.username}</td>
-                                <td style={{ padding: '10px 16px', fontFamily: 'monospace', color: '#94a3b8' }}>Şifre gizli</td>
-                                <td style={{ padding: '10px 16px', textAlign: 'right' }}>
-                                  <button onClick={() => removeUser(member.id)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: 12 }}>Çıkar</button>
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    )}
-
-                    {!isManager && workers.map(member => (
-                      <div key={member.id} className="member-item">
-                        <div className="member-avatar" style={{ background: '#94a3b8' }}>{member.name?.charAt(0)?.toUpperCase()}</div>
-                        <div className="member-info">
-                          <span className="member-name">{member.name}</span>
-                          <span className="member-role">{member.role || 'Çalışan'}</span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </>
+  const MemberCard = ({ m, role }) => {
+    const meta = project?.memberMeta?.[m.id] || {};
+    return (
+      <div
+        onClick={() => openEdit(m, role)}
+        style={{
+          display: 'flex', alignItems: 'center', gap: 14, background: 'var(--bg-card)',
+          padding: 12, borderRadius: 12, marginBottom: 12, border: '1px solid var(--border-color)',
+          cursor: isManager ? 'pointer' : 'default',
+        }}
+      >
+        <div style={{ width: 48, height: 48, borderRadius: 24, background: '#e0e7ff', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#4f46e5', fontWeight: 800, fontSize: 18 }}>
+          {m.name?.charAt(0)?.toUpperCase() || '?'}
+        </div>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--text-main)' }}>
+            {m.name} {role === 'manager' ? '👑' : '👷'}
+            {meta.mahlas ? <span style={{ fontSize: 13, fontWeight: 500, color: '#6366f1' }}>  ·  "{meta.mahlas}"</span> : null}
+          </div>
+          <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>{meta.title || (role === 'manager' ? 'Yönetici' : 'Personel')}</div>
+          {meta.groups?.length > 0 && (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginTop: 7 }}>
+              {meta.groups.map(g => (
+                <span key={g} style={{ padding: '3px 8px', borderRadius: 6, fontSize: 10, fontWeight: 700, color: colorFor(g), background: colorFor(g) + '22' }}>{g}</span>
+              ))}
+            </div>
+          )}
+        </div>
+        {isManager && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }} onClick={e => e.stopPropagation()}>
+            <button onClick={() => openEdit(m, role)} title="Düzenle" style={{ padding: 8, background: '#eef2ff', border: 'none', borderRadius: 8, cursor: 'pointer', color: '#4f46e5', display: 'flex' }}>
+              <Pencil size={16} />
+            </button>
+            {m.id !== currentUser?.uid && (
+              <button onClick={() => removeUser(m.id, role)} title="Çıkar" style={{ padding: 8, background: '#fee2e2', border: 'none', borderRadius: 8, cursor: 'pointer', color: '#ef4444', display: 'flex' }}>
+                <UserMinus size={18} />
+              </button>
             )}
           </div>
         )}
+      </div>
+    );
+  };
 
-        {activeSection === 'add' && isManager && (
-          <div>
+  return (
+    <div style={{ padding: 24 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+        <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: 'var(--primary-color)' }}>Yöneticiler ({managers.length})</h3>
+      </div>
+      {managers.length === 0 && <p className="empty-state">Yönetici atanmamış.</p>}
+      {managers.map(m => <MemberCard key={m.id} m={m} role="manager" />)}
 
-            <h4 style={{ marginBottom: 12, color: '#94a3b8' }}>Hızlı Kullanıcı Oluştur</h4>
-            <p style={{ fontSize: 12, color: '#64748b', marginBottom: 16 }}>
-              Kullanıcı adı ve şifre sistem tarafından otomatik oluşturulur.
-            </p>
-            <div className="add-user-form" style={{ background: 'var(--bg-card)', padding: 20, borderRadius: 12, border: '1px solid var(--border-color)' }}>
-              <input placeholder="Ad Soyad *" value={newUser.name} onChange={e => setNewUser({...newUser, name: e.target.value})} style={{ width: '100%', padding: '10px 12px', borderRadius: 6, border: '1px solid var(--border-color)', background: 'var(--bg-surface)', color: 'var(--text-main)', marginBottom: 12 }} />
-              <input placeholder="(Opsiyonel) Özel Ünvan/Mahlas (Örn: Proje Müdürü)" value={newUser.customTitle} onChange={e => setNewUser({...newUser, customTitle: e.target.value})} style={{ width: '100%', padding: '10px 12px', borderRadius: 6, border: '1px solid var(--border-color)', background: 'var(--bg-surface)', color: 'var(--text-main)', marginBottom: 16 }} />
-              
-              <RoleSelector />
-              <button className="btn-primary" onClick={createUserAndAdd} disabled={loading} style={{ width: '100%', marginTop: 8 }}>
-                {loading ? 'Oluşturuluyor...' : 'Hızlı Oluştur ve Ekle'}
-              </button>
+      <div style={{ height: 1, background: 'var(--border-color)', margin: '20px 0' }} />
+
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+        <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: 'var(--primary-color)' }}>Çalışanlar ({workers.length})</h3>
+        {isManager && (
+          <button className="btn-primary" onClick={openCreate} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <UserPlus size={16} /> Yeni Çalışan
+          </button>
+        )}
+      </div>
+      {workers.length === 0 && <p className="empty-state">Çalışan yok. Eklemek için "Yeni Çalışan" butonuna basın.</p>}
+      {workers.map(m => <MemberCard key={m.id} m={m} role="worker" />)}
+
+      {showModal && (
+        <WorkerModal
+          projectId={projectId}
+          editMember={editMember}
+          onClose={() => setShowModal(false)}
+          onSaved={fetchMembers}
+        />
+      )}
+    </div>
+  );
+}
+
+// ── Çalışan oluştur / düzenle modalı (MOBİL AddWorkerModal karşılığı) ──
+function WorkerModal({ projectId, editMember, onClose, onSaved }) {
+  const isEdit = !!editMember;
+  const [name, setName] = useState('');
+  const [surname, setSurname] = useState('');
+  const [mahlas, setMahlas] = useState('');
+  const [role, setRole] = useState('worker');
+  const [titleSel, setTitleSel] = useState('');
+  const [customTitle, setCustomTitle] = useState('');
+  const [groups, setGroups] = useState([]);
+  const [password, setPassword] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const [created, setCreated] = useState(null);
+
+  useEffect(() => {
+    if (editMember) {
+      const m = editMember.meta || {};
+      setName((editMember.name || '').split(' ')[0] || '');
+      setSurname((editMember.name || '').split(' ').slice(1).join(' '));
+      setMahlas(m.mahlas || '');
+      setRole(editMember.role || 'worker');
+      if (m.title && !TITLE_PRESETS.includes(m.title)) { setTitleSel('Diğer'); setCustomTitle(m.title); }
+      else { setTitleSel(m.title || ''); setCustomTitle(''); }
+      setGroups(m.groups || []);
+    }
+  }, [editMember]);
+
+  const usernamePreview = useMemo(() => slugifyName(`${name}${surname}`), [name, surname]);
+  const finalTitle = titleSel === 'Diğer' ? customTitle.trim() : titleSel;
+  const toggleGroup = (label) => setGroups(prev => prev.includes(label) ? prev.filter(g => g !== label) : [...prev, label]);
+
+  const handleSave = async () => {
+    setError('');
+    if (!name.trim() || !surname.trim()) { setError('Ad ve soyad zorunludur.'); return; }
+    if (groups.length === 0) { setError('En az bir ilgi grubu seçin.'); return; }
+    setSaving(true);
+    try {
+      if (isEdit) {
+        await updateWorkerMeta({ projectId, uid: editMember.id, mahlas: mahlas.trim(), title: finalTitle, role, groups });
+        onSaved?.(); onClose(); return;
+      }
+      const pw = password.trim();
+      if (pw.length < 6) { setError('Şifre en az 6 karakter olmalı.'); setSaving(false); return; }
+      const res = await createWorkerAccount({
+        projectId, name: name.trim(), surname: surname.trim(),
+        mahlas: mahlas.trim(), title: finalTitle, role, groups, password: pw,
+      });
+      onSaved?.();
+      setCreated({ username: res.username, password: pw });
+    } catch (e) {
+      console.error('Çalışan kaydı hatası:', e);
+      setError(e?.code === 'auth/email-already-in-use'
+        ? 'Bu kullanıcı adı zaten kullanımda. Mahlası/ismi değiştirip tekrar deneyin.'
+        : (e?.message || 'Çalışan eklenemedi.'));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const inputStyle = { width: '100%', padding: '11px 14px', borderRadius: 12, border: '1px solid var(--border-color)', background: 'var(--bg-surface)', color: 'var(--text-main)', fontSize: 15 };
+  const labelStyle = { display: 'block', fontSize: 13, fontWeight: 700, color: 'var(--text-muted)', marginBottom: 6, marginTop: 14 };
+
+  if (created) {
+    return (
+      <div className="modal-overlay" onClick={onClose} style={{ zIndex: 1000 }}>
+        <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 420, textAlign: 'center' }}>
+          <div style={{ width: 72, height: 72, borderRadius: 36, background: '#ecfdf5', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '8px auto 16px' }}>
+            <Check size={40} color="#10b981" />
+          </div>
+          <h2 style={{ margin: 0 }}>Çalışan oluşturuldu!</h2>
+          <p style={{ color: 'var(--text-muted)', fontSize: 13, marginTop: 8 }}>Bu bilgileri çalışana iletin. İlk girişten sonra şifresini değiştirebilir.</p>
+          <div style={{ background: 'var(--bg-surface)', borderRadius: 16, border: '1px solid var(--border-color)', margin: '20px 0', textAlign: 'left' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '14px 16px' }}>
+              <span style={{ color: 'var(--text-muted)', fontSize: 13, fontWeight: 600 }}>Kullanıcı adı</span>
+              <span style={{ fontWeight: 800 }}>{created.username}</span>
+            </div>
+            <div style={{ height: 1, background: 'var(--border-color)' }} />
+            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '14px 16px' }}>
+              <span style={{ color: 'var(--text-muted)', fontSize: 13, fontWeight: 600 }}>Şifre</span>
+              <span style={{ fontWeight: 800 }}>{created.password}</span>
             </div>
           </div>
-        )}
+          <button className="btn-secondary" onClick={() => navigator.clipboard?.writeText(`Kullanıcı adı: ${created.username}\nŞifre: ${created.password}`)} style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '0 auto 12px' }}>
+            <Copy size={18} /> Bilgileri Kopyala
+          </button>
+          <button className="btn-primary" onClick={onClose} style={{ width: '100%' }}>Tamam</button>
+        </div>
+      </div>
+    );
+  }
 
-        {activeSection === 'groups' && isManager && (
-          <div>
-            <div className="add-row">
-              <input placeholder="Yeni grup adı (örn: Mimar Grubu)" value={newGroupName}
-                onChange={e => setNewGroupName(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && createGroup()} />
-              <button className="btn-primary" onClick={createGroup}>+ Ekle</button>
+  return (
+    <div className="modal-overlay" onClick={onClose} style={{ zIndex: 1000 }}>
+      <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 500 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+          <h2 style={{ margin: 0 }}>{isEdit ? 'Çalışanı Düzenle' : 'Yeni Çalışan'}</h2>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}><X size={20} /></button>
+        </div>
+
+        <div style={{ maxHeight: '65vh', overflowY: 'auto', paddingRight: 8 }}>
+          {error && <p style={{ color: '#ef4444', fontSize: 13, fontWeight: 600 }}>{error}</p>}
+
+          <div style={{ display: 'flex', gap: 12 }}>
+            <div style={{ flex: 1 }}>
+              <label style={labelStyle}>Ad</label>
+              <input style={inputStyle} value={name} onChange={e => setName(e.target.value)} placeholder="Abdullah" disabled={isEdit} />
             </div>
-            <div className="team-list">
-              {groups.length === 0 ? <p className="empty-state">Henüz grup yok.</p> : groups.map(group => (
-                <div key={group.id} className="team-item">
-                  <span>🏷️ {group.name}</span>
-                </div>
-              ))}
+            <div style={{ flex: 1 }}>
+              <label style={labelStyle}>Soyad</label>
+              <input style={inputStyle} value={surname} onChange={e => setSurname(e.target.value)} placeholder="Emin" disabled={isEdit} />
             </div>
           </div>
-        )}
+          {isEdit && <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>Ad-soyad ve kullanıcı adı değiştirilemez.</p>}
+
+          {!isEdit && usernamePreview && (
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, background: '#eef2ff', borderRadius: 12, padding: '10px 14px', marginTop: 12 }}>
+              <span style={{ fontSize: 11, fontWeight: 700, color: '#6366f1', flex: 1 }}>Kullanıcı adı</span>
+              <span style={{ fontSize: 15, fontWeight: 800, color: '#4338ca' }}>{usernamePreview}</span>
+              <span style={{ fontSize: 12, color: '#818cf8' }}>@{EMAIL_DOMAIN}</span>
+            </div>
+          )}
+
+          <label style={labelStyle}>Mahlas (takma ad)</label>
+          <input style={inputStyle} value={mahlas} onChange={e => setMahlas(e.target.value)} placeholder="Sohbette görünecek isim" />
+
+          <label style={labelStyle}>Yetki Seviyesi</label>
+          <div style={{ display: 'flex', gap: 10 }}>
+            <button onClick={() => setRole('worker')} style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: 12, borderRadius: 12, border: '1px solid var(--border-color)', cursor: 'pointer', background: role === 'worker' ? '#4f46e5' : 'var(--bg-card)', color: role === 'worker' ? '#fff' : 'var(--text-muted)', fontWeight: 700 }}>
+              <HardHat size={18} /> Çalışan
+            </button>
+            <button onClick={() => setRole('manager')} style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: 12, borderRadius: 12, border: '1px solid var(--border-color)', cursor: 'pointer', background: role === 'manager' ? '#0891b2' : 'var(--bg-card)', color: role === 'manager' ? '#fff' : 'var(--text-muted)', fontWeight: 700 }}>
+              <Shield size={18} /> Yönetici
+            </button>
+          </div>
+
+          <label style={labelStyle}>Görev / Ünvan</label>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+            {[...TITLE_PRESETS, 'Diğer'].map(t => (
+              <button key={t} onClick={() => setTitleSel(t)} style={{ padding: '8px 13px', borderRadius: 20, border: '1px solid var(--border-color)', cursor: 'pointer', background: titleSel === t ? '#1e293b' : 'var(--bg-card)', color: titleSel === t ? '#fff' : 'var(--text-muted)', fontWeight: 600, fontSize: 13 }}>{t}</button>
+            ))}
+          </div>
+          {titleSel === 'Diğer' && (
+            <input style={{ ...inputStyle, marginTop: 8 }} value={customTitle} onChange={e => setCustomTitle(e.target.value)} placeholder="Görev/ünvan yazın" />
+          )}
+
+          <label style={labelStyle}>İlgi Grupları (bildirim alacağı alanlar)</label>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+            {CATEGORIES.map(g => {
+              const on = groups.includes(g.key);
+              return (
+                <button key={g.key} onClick={() => toggleGroup(g.key)} style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '8px 13px', borderRadius: 20, border: `1px solid ${on ? g.color : 'var(--border-color)'}`, cursor: 'pointer', background: on ? g.color : 'var(--bg-card)', color: on ? '#fff' : 'var(--text-muted)', fontWeight: 700, fontSize: 13 }}>
+                  {on && <Check size={13} />} {g.key}
+                </button>
+              );
+            })}
+          </div>
+
+          {!isEdit && (
+            <>
+              <label style={labelStyle}>Başlangıç Şifresi</label>
+              <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>Çalışana ileteceğiniz ilk şifre (en az 6 karakter). İlk girişten sonra değiştirebilir.</p>
+              <input style={inputStyle} type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="En az 6 karakter" />
+            </>
+          )}
+        </div>
+
+        <div className="modal-actions" style={{ marginTop: 20, display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+          <button className="btn-secondary" onClick={onClose}>İptal</button>
+          <button className="btn-primary" onClick={handleSave} disabled={saving} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <UserPlus size={18} /> {saving ? 'Kaydediliyor...' : (isEdit ? 'Kaydet' : 'Çalışan Oluştur')}
+          </button>
+        </div>
       </div>
     </div>
   );

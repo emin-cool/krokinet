@@ -4,7 +4,8 @@ import { collection, query, where, orderBy, onSnapshot, addDoc, serverTimestamp,
 import { X, Send, Paperclip, FileText, CornerUpLeft, Search, Pin, PinOff, Info, Images, MapPin, UserCheck } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import ImageMarkupModal from './ImageMarkupModal';
-import { CATEGORY_COLORS } from '../utils/constants';
+import { colorFor, isResolved } from '../utils/constants';
+import { msgUrl, isImageMsg, attachmentType } from '../utils/media';
 import './PinDetailModal.css';
 
 const CLOUDINARY_PRESET = 'insaat_preset';
@@ -13,7 +14,6 @@ const CLOUDINARY_CLOUD = 'dfl7x5dud';
 export default function PinDetailModal({ pin, pins, setSelectedPin, projectId, isManager, onClose }) {
   const { currentUser, userData } = useAuth();
   const [messages, setMessages] = useState([]);
-  const [files, setFiles] = useState([]);
   const [text, setText] = useState('');
   const [replyTo, setReplyTo] = useState(null);
   const [uploading, setUploading] = useState(false);
@@ -41,7 +41,9 @@ export default function PinDetailModal({ pin, pins, setSelectedPin, projectId, i
   const bottomRef = useRef(null);
 
   useEffect(() => {
-    const qUsers = query(collection(db, 'users'));
+    // Etiketleme (mention) listesi herkese açık profillerden okunur — katı kurallar
+    // altında 'users' yalnızca sahibi tarafından okunabilir.
+    const qUsers = query(collection(db, 'publicProfiles'));
     const unsub = onSnapshot(qUsers, snap => {
       setUsers(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     });
@@ -64,12 +66,7 @@ export default function PinDetailModal({ pin, pins, setSelectedPin, projectId, i
       setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 200);
     });
 
-    const qFiles = query(collection(db, 'files'), where('pinId', '==', pin.id), orderBy('createdAt', 'desc'));
-    const unsubFiles = onSnapshot(qFiles, snap => {
-      setFiles(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-    });
-
-    return () => { unsubMsg(); unsubFiles(); };
+    return () => { unsubMsg(); };
   }, [pin.id]);
 
   async function sendMessage(fileUrl = null, fileType = null, fileDescription = '') {
@@ -79,13 +76,14 @@ export default function PinDetailModal({ pin, pins, setSelectedPin, projectId, i
       await addDoc(collection(db, 'messages'), {
         pinId: pin.id,
         projectId,
-        text: messageText,
+        // Medya mesajlarında text = açıklama/dosya adı (mobil ile aynı davranış)
+        text: messageText || fileDescription || '',
         userId: currentUser.uid,
         userName: userData?.name,
         userRole: userData?.role,
         replyTo,
-        fileUrl,
-        type: fileType,
+        // MOBİL şema: `url` + kanonik `type` ('image'|'file'|'text')
+        ...(fileUrl ? { url: fileUrl, type: attachmentType(fileType) } : { type: 'text' }),
         description: fileDescription,
         isPinned: false,
         createdAt: serverTimestamp()
@@ -132,17 +130,9 @@ export default function PinDetailModal({ pin, pins, setSelectedPin, projectId, i
       const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD}/auto/upload`, { method: 'POST', body: formData });
       const data = await res.json();
       if (!res.ok || data.error) { alert('Dosya yüklenemedi.'); setUploading(false); return; }
-      if (target === 'chat') {
-        await sendMessage(data.secure_url, file.type, description);
-      } else {
-        await addDoc(collection(db, 'files'), {
-          pinId: pin.id, projectId,
-          userId: currentUser.uid, userName: userData?.name,
-          name: file.name, url: data.secure_url, type: file.type,
-          description: description,
-          createdAt: serverTimestamp()
-        });
-      }
+      // Hem sohbet hem "dosya" ekleri artık MOBİL ile aynı şekilde `messages`
+      // koleksiyonuna yazılır (ayrı `files` koleksiyonu kaldırıldı).
+      await sendMessage(data.secure_url, file.type, description || file.name || '');
     } catch (err) { alert('Yükleme başarısız'); }
     setUploading(false);
   }
@@ -224,6 +214,8 @@ export default function PinDetailModal({ pin, pins, setSelectedPin, projectId, i
   const filteredUsers = users.filter(u => u.name?.toLowerCase().includes(mentionSearch));
   const filteredPins = (pins || []).filter(p => (p.title || p.category || '').toLowerCase().includes(searchPins.toLowerCase()));
   const displayedMessages = showSearch && chatSearch ? messages.filter(m => m.text?.toLowerCase().includes(chatSearch.toLowerCase())) : messages;
+  // Medya sekmesi: ek (url) içeren tüm mesajlar (mobil ile aynı kaynak)
+  const mediaMessages = messages.filter(m => msgUrl(m));
 
   return (
     <div className="discussion-overlay" onClick={onClose}>
@@ -259,7 +251,7 @@ export default function PinDetailModal({ pin, pins, setSelectedPin, projectId, i
                   <h4>{p.title || `Pin ${p.category}`}</h4>
                   <div className="pin-item-footer">
                     <span className="category-badge" style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', fontWeight: 600, color: 'var(--text-secondary)' }}>
-                      <span style={{ display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', backgroundColor: CATEGORY_COLORS[(p.category || 'genel').toLowerCase()] || 'var(--primary-color)' }}></span>
+                      <span style={{ display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', backgroundColor: colorFor(p.category) }}></span>
                       {(p.category || 'Genel').toUpperCase()}
                     </span>
                     {p.info && <span className="pin-desc">{p.info}</span>}
@@ -279,8 +271,8 @@ export default function PinDetailModal({ pin, pins, setSelectedPin, projectId, i
             <div>
               <div className="header-title-row">
                 <h2>Pin #{pin.number || pin.id.slice(0,4)} - {pinTitle}</h2>
-                <span className={`status-badge ${status === 'çözüldü' ? 'resolved' : 'open'}`}>
-                  {status === 'çözüldü' ? 'RESOLVED' : 'OPEN'}
+                <span className={`status-badge ${isResolved(status) ? 'resolved' : 'open'}`}>
+                  {isResolved(status) ? 'RESOLVED' : 'OPEN'}
                 </span>
               </div>
               <div className="header-meta">
@@ -386,14 +378,14 @@ export default function PinDetailModal({ pin, pins, setSelectedPin, projectId, i
               <div className="accordion-content">
                 <div className="media-header">
                   <h4><Images size={16} /> Dosyalar</h4>
-                  <span className="file-count">{files.length} Dosya</span>
+                  <span className="file-count">{mediaMessages.length} Dosya</span>
                 </div>
                 <div className="media-list">
-                  {files.map(f => (
-                    f.type?.startsWith('image/') ? (
-                      <img key={f.id} src={f.url} alt="" className="media-thumb" onClick={() => window.open(f.url, '_blank')} />
+                  {mediaMessages.map(f => (
+                    isImageMsg(f) ? (
+                      <img key={f.id} src={msgUrl(f)} alt="" className="media-thumb" onClick={() => window.open(msgUrl(f), '_blank')} />
                     ) : (
-                      <div key={f.id} className="media-doc-thumb" onClick={() => window.open(f.url, '_blank')}>
+                      <div key={f.id} className="media-doc-thumb" onClick={() => window.open(msgUrl(f), '_blank')}>
                         <FileText size={24} />
                       </div>
                     )
@@ -442,10 +434,10 @@ export default function PinDetailModal({ pin, pins, setSelectedPin, projectId, i
                               {msg.replyTo.text.length > 50 ? msg.replyTo.text.substring(0,50)+'...' : msg.replyTo.text}
                             </div>
                           )}
-                          {msg.type === 'image/jpeg' || msg.type === 'image/png' || msg.type === 'image/webp' ? (
-                            <img src={msg.fileUrl} alt="Eklenti" className="chat-image" onClick={() => window.open(msg.fileUrl, '_blank')} />
-                          ) : msg.fileUrl ? (
-                            <a href={msg.fileUrl} target="_blank" rel="noreferrer" className="chat-doc">
+                          {isImageMsg(msg) ? (
+                            <img src={msgUrl(msg)} alt="Eklenti" className="chat-image" onClick={() => window.open(msgUrl(msg), '_blank')} />
+                          ) : msgUrl(msg) ? (
+                            <a href={msgUrl(msg)} target="_blank" rel="noreferrer" className="chat-doc">
                               <FileText size={16} /> {msg.text || 'Dosya'}
                             </a>
                           ) : (

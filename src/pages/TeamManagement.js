@@ -72,6 +72,13 @@ export default function TeamManagement({ onClose }) {
         groupId: newUser.groupId,
         isSuperAdmin: false
       });
+      // Herkese açık profil (mobil/web tutarlılığı)
+      await setDoc(doc(db, 'publicProfiles', userCred.user.uid), {
+        name: newUser.name,
+        role: selectedGroup?.name || '',
+        profilePic: '',
+        mahlas: '',
+      }, { merge: true }).catch(() => {});
       await secondaryAuth.signOut();
       setNewUser({ name: '', email: '', password: '', groupId: '' });
       alert(`Kullanıcı başarıyla oluşturuldu!\n\nGeçici Şifre: ${autoPassword}\n\nLütfen bu şifreyi kullanıcıyla paylaşın.`);

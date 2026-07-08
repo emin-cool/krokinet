@@ -28,8 +28,24 @@ export default function Login() {
     setError('');
     setLoading(true);
     try {
-      const emailAddress = username.includes('@') ? username : `${username.toLowerCase().replace(/\s+/g, '')}@insaat-app.com`;
-      await signInWithEmailAndPassword(auth, emailAddress, password);
+      const uname = username.toLowerCase().replace(/\s+/g, '');
+      if (username.includes('@')) {
+        await signInWithEmailAndPassword(auth, username, password);
+      } else {
+        // Mobil ile ortak alan adı önce denenir; eski web hesapları için yedek.
+        try {
+          await signInWithEmailAndPassword(auth, `${uname}@santi.app`, password);
+        } catch (err) {
+          const code = err?.code || '';
+          // Yalnızca "kullanıcı/kimlik bulunamadı" hatalarında diğer alan adını dene;
+          // yanlış şifre gibi hatalarda ikinci denemeyle kilitlenmeyi tetiklemeyelim.
+          if (code === 'auth/invalid-credential' || code === 'auth/user-not-found' || code === 'auth/invalid-email') {
+            await signInWithEmailAndPassword(auth, `${uname}@insaat-app.com`, password);
+          } else {
+            throw err;
+          }
+        }
+      }
       setFailedAttempts(0);
       navigate('/');
     } catch {

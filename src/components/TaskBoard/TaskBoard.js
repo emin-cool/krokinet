@@ -1,14 +1,15 @@
 import React, { useState } from 'react';
 import TaskCard from './TaskCard';
 import { Search } from 'lucide-react';
+import { CATEGORY_KEYS, normCat } from '../../utils/constants';
 
 export default function TaskBoard({ events, onTaskClick, onAddToCalendar }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('Tümü');
   const [statusFilter, setStatusFilter] = useState('Tümü'); // Tümü, Gecikenler, Yaklaşanlar
 
-  // Kategoriler (Kroki ile birebir aynı)
-  const categories = ['Tümü', 'yapısal', 'elektrik', 'tesisat', 'mekanik', 'mimari', 'joker'];
+  // Kategoriler (Kroki/pin ile birebir aynı — mobil ile paylaşılan tek kaynak)
+  const categories = ['Tümü', ...CATEGORY_KEYS];
 
   const today = new Date();
   today.setHours(0,0,0,0);
@@ -19,7 +20,7 @@ export default function TaskBoard({ events, onTaskClick, onAddToCalendar }) {
     if (searchTerm && !e.title.toLowerCase().includes(searchTerm.toLowerCase())) return false;
     
     // 2. Kategori filtresi
-    if (categoryFilter !== 'Tümü' && e.category !== categoryFilter) return false;
+    if (categoryFilter !== 'Tümü' && normCat(e.category) !== normCat(categoryFilter)) return false;
 
     // 3. Durum filtresi
     if (statusFilter === 'Gecikenler') {

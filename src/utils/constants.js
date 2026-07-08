@@ -1,3 +1,6 @@
+// Kategori / pin taksonomisi MOBİL ile paylaşılan tek kaynaktan gelir (./categories.js).
+import { CATEGORIES, STATUS_COLOR } from './categories';
+
 export const MATERIALS = [
   { id: 'bakir', name: 'Bakır', unit: 'kg', category: 'metal', emoji: '🔶' },
   { id: 'aluminyum', name: 'Alüminyum', unit: 'kg', category: 'metal', emoji: '⬜' },
@@ -20,21 +23,31 @@ export const SECTIONS = [
   { key: 'tesisat', title: '🔵 Tesisat' },
 ];
 
-// Centralized category colors — D19, K7 fix
-export const CATEGORY_COLORS = {
-  'yapısal': '#ef4444',
-  'elektrik': '#eab308',
-  'tesisat': '#22c55e',
-  'mekanik': '#f97316',
-  'mimari': '#a855f7',
-  'joker': '#ec4899',
-  'genel': '#3b82f6',
-};
+// ── Kategori / pin taksonomisi artık MOBİL ile paylaşılan tek kaynaktan gelir ──
+// (bkz. ./categories.js). Aşağıdaki eski dışa aktarımlar YALNIZCA geriye dönük
+// uyum içindir; yeni kod doğrudan colorFor()/normCat()/isResolved() kullanmalı.
 
+// Ortak taksonomi yardımcılarını buradan da erişilebilir kıl (tek import noktası)
+export {
+  CATEGORIES, CATEGORY_KEYS, normCat, colorFor, catEquals,
+  PIN_STATUS, normStatus, isResolved, STATUS_LABEL, STATUS_COLOR,
+} from './categories';
+
+// Geriye dönük uyum: eski kod CATEGORY_COLORS[key] ile erişiyor. Hem kanonik
+// (büyük harf) hem eski (küçük harf) anahtarları içerecek şekilde türetilir.
+export const CATEGORY_COLORS = CATEGORIES.reduce((acc, c) => {
+  acc[c.key] = c.color;
+  acc[c.key.toLocaleLowerCase('tr')] = c.color;
+  return acc;
+}, { joker: '#ec4899' }); // 'joker': mobilde yok, eski web verisinde kalmış olabilir
+
+// Geriye dönük uyum: eski pin durum → renk eşlemesi (hem eski hem kanonik).
 export const PIN_COLORS = {
-  'açık': '#ef4444',
+  'açık': STATUS_COLOR.OPEN,
   'devam ediyor': '#f59e0b',
-  'çözüldü': '#22c55e',
+  'çözüldü': STATUS_COLOR.RESOLVED,
+  OPEN: STATUS_COLOR.OPEN,
+  RESOLVED: STATUS_COLOR.RESOLVED,
 };
 
 // Strong password generator — Y1 fix

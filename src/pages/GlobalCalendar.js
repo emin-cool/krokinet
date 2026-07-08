@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { ChevronLeft, ChevronRight, Search, Plus, Calendar as CalendarIcon, Clock, X, Trash2, MapPin } from 'lucide-react';
-import { collection, query, onSnapshot, addDoc, updateDoc, deleteDoc, doc } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, addDoc, updateDoc, deleteDoc, doc } from 'firebase/firestore';
 import { db } from '../firebase';
 import './GlobalCalendar.css';
 
@@ -16,7 +16,7 @@ const EVENT_COLORS = [
 ];
 
 export default function GlobalCalendar() {
-  const { userData } = useAuth();
+  const { userData, currentUser } = useAuth();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [projects, setProjects] = useState([]);
   const [calendarEvents, setCalendarEvents] = useState([]);
@@ -34,23 +34,32 @@ export default function GlobalCalendar() {
   });
 
   useEffect(() => {
-    // Projelerdeki görevler
-    const q = query(collection(db, 'projects'));
-    const unsub = onSnapshot(q, snap => {
-      setProjects(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-    });
+    if (!currentUser) return undefined;
+    const uid = currentUser.uid;
 
-    // Bağımsız takvim etkinlikleri
+    // Yalnızca kullanıcının kendi projeleri (üye VEYA yönetici). Katı Firestore
+    // kuralları kapsamsız `projects` sorgusunu reddeder; ayrıca kullanıcıya sadece
+    // ilgili projelerin görevlerini göstermek daha doğru.
+    const projMap = {};
+    const applyProj = snap => {
+      snap.docs.forEach(d => { projMap[d.id] = { id: d.id, ...d.data() }; });
+      setProjects(Object.values(projMap));
+    };
+    const unsubMember  = onSnapshot(query(collection(db, 'projects'), where('memberIds', 'array-contains', uid)), applyProj);
+    const unsubManager = onSnapshot(query(collection(db, 'projects'), where('managerId', '==', uid)), applyProj);
+
+    // Bağımsız takvim etkinlikleri (web'e özgü paylaşımlı takvim)
     const eQ = query(collection(db, 'calendar_events'));
     const unsubE = onSnapshot(eQ, snap => {
       setCalendarEvents(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     });
 
     return () => {
-      unsub();
+      unsubMember();
+      unsubManager();
       unsubE();
     };
-  }, []);
+  }, [currentUser]);
 
   // Tüm etkinlikleri birleştir
   const allTasks = [...calendarEvents.map(e => ({...e, isGlobal: true}))];

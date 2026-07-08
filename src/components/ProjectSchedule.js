@@ -15,7 +15,7 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { useAuth } from '../contexts/AuthContext';
 import TaskBoard from './TaskBoard/TaskBoard';
-import { CATEGORY_COLORS, generateUniqueId } from '../utils/constants';
+import { CATEGORIES, colorFor, generateUniqueId } from '../utils/constants';
 
 moment.locale('tr');
 const localizer = momentLocalizer(moment);
@@ -31,7 +31,7 @@ export default function ProjectSchedule({ project, projectId, fetchProject, isMa
   const [showModal, setShowModal] = useState(false);
   const [editingTask, setEditingTask] = useState(null);
   const [formData, setFormData] = useState({
-    title: '', startDate: '', startTime: '09:00', endDate: '', endTime: '10:00', color: '#3b82f6', description: '', category: 'Genel', dependencies: '', progress: 0
+    title: '', startDate: '', startTime: '09:00', endDate: '', endTime: '10:00', color: '#3b82f6', description: '', category: 'GENEL', dependencies: '', progress: 0
   });
 
   const schedule = project.schedule || [];
@@ -166,7 +166,7 @@ export default function ProjectSchedule({ project, projectId, fetchProject, isMa
     setFormData({
       title: '', startDate, startTime,
       endDate: moment(end).isSame(start, 'day') ? endDate : moment(end).subtract(1, 'days').format('YYYY-MM-DD'),
-      endTime, color: '#3b82f6', description: '', category: 'Genel', dependencies: '', progress: 0
+      endTime, color: '#3b82f6', description: '', category: 'GENEL', dependencies: '', progress: 0
     });
     setShowModal(true);
   };
@@ -493,7 +493,7 @@ export default function ProjectSchedule({ project, projectId, fetchProject, isMa
                       setFormData({
                         ...formData, 
                         category: newCat,
-                        color: CATEGORY_COLORS[newCat.toLowerCase()] || formData.color
+                        color: colorFor(newCat)
                       });
                     }}
                     style={{ 
@@ -508,12 +508,9 @@ export default function ProjectSchedule({ project, projectId, fetchProject, isMa
                     }}
                   >
                     <option value="">Seçiniz...</option>
-                    <option value="yapısal">Yapısal</option>
-                    <option value="mimari">Mimari</option>
-                    <option value="tesisat">Tesisat</option>
-                    <option value="elektrik">Elektrik</option>
-                    <option value="mekanik">Mekanik</option>
-                    <option value="joker">Joker</option>
+                    {CATEGORIES.map(c => (
+                      <option key={c.key} value={c.key}>{c.key}</option>
+                    ))}
                   </select>
                 </div>
                 <div style={{ flex: 1 }}>
@@ -541,7 +538,7 @@ export default function ProjectSchedule({ project, projectId, fetchProject, isMa
                 <div style={{ flex: 2 }}>
                   <label style={{ display: 'block', fontSize: 13, marginBottom: 4, color: 'var(--text-muted)' }}>Renk</label>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                    {Object.values(CATEGORY_COLORS).map(color => (
+                    {CATEGORIES.map(c => c.color).map(color => (
                       <div 
                         key={color} 
                         onClick={() => setFormData({...formData, color})}
